@@ -1,0 +1,18 @@
+@import 'tailwindcss';
+
+/* Global base styles layered on top of Tailwind utilities.
+   We keep this minimal because most styling will be done with
+   Tailwind utility classes and some styled components later. */
+
+:root {
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'SF Pro Text',
+    'Segoe UI', sans-serif;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  margin: 0;
+}
+
