@@ -1,5 +1,5 @@
 /**
- * API client for Logic Looper backend. Used for guest creation and score sync.
+ * API client for Logic Looper backend. Used for guest creation, score sync, and user profile.
  */
 
 const getBaseUrl = (): string => {
@@ -45,4 +45,21 @@ export async function submitScore(body: SubmitScoreBody): Promise<{ accepted: bo
 
 export function isOnline(): boolean {
   return typeof navigator !== 'undefined' && navigator.onLine;
+}
+
+/** User profile from GET /api/users/:id (with stats and recent daily scores). */
+export interface UserProfile {
+  id: string;
+  email: string | null;
+  streakCount: number;
+  lastPlayed: string | null;
+  totalPoints: number;
+  stats: { puzzlesSolved: number; avgSolveTimeMs: number | null } | null;
+  dailyScores: Array<{ date: string; puzzleId: string; score: number; timeTakenMs: number | null }>;
+}
+
+export async function fetchUser(userId: string): Promise<UserProfile> {
+  const res = await fetch(`${getBaseUrl()}/api/users/${userId}`);
+  if (!res.ok) throw new Error(`fetchUser failed: ${res.status}`);
+  return res.json() as Promise<UserProfile>;
 }

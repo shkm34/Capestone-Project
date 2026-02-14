@@ -1,6 +1,7 @@
-import { createGuest, submitScore as apiSubmitScore, isOnline } from '../../services/api';
+import { createGuest, submitScore as apiSubmitScore, fetchUser, isOnline } from '../../services/api';
 import type { AppDispatch, RootState } from '../index';
 import { setGuest } from '../slices/authSlice';
+import { setUserProfile, setProfileFetchError } from '../slices/userProfileSlice';
 import { enqueueScore, clearPendingScores } from '../slices/syncSlice';
 import type { PendingScore } from '../slices/syncSlice';
 
@@ -98,6 +99,22 @@ export function flushPendingScores(): AppThunk {
       dispatch(clearPendingScores());
     } catch (e) {
       console.warn('[sync] flushPendingScores failed', e);
+    }
+  };
+}
+
+/** Fetch user profile from API and put in Redux (then persisted to IndexedDB). Call when we have userId. */
+export function fetchUserProfile(): AppThunk {
+  return async (dispatch, getState) => {
+    const uid = getState().auth.userId;
+    if (!uid || !isOnline()) return;
+    try {
+      const user = await fetchUser(uid);
+      dispatch(setUserProfile(user));
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Fetch failed';
+      dispatch(setProfileFetchError(msg));
+      console.warn('[sync] fetchUserProfile failed', e);
     }
   };
 }

@@ -26,9 +26,14 @@ export const useDailySequenceGame = () => {
   const hasUsedHintToday = todayMeta?.usedHint ?? false;
   const streak = progress.streak;
 
+  // Regenerate puzzle when the calendar day changes; use todayIso so puzzle and progress use the same "today".
   useEffect(() => {
-    setPuzzle(generateDailySequencePuzzle(new Date()));
-  }, []);
+    setPuzzle(generateDailySequencePuzzle(todayIso));
+    setInput('');
+    setIsCorrect(null);
+    setScore(null);
+    setHintText(null);
+  }, [todayIso]);
 
   const visibleSequence = useMemo(
     () =>

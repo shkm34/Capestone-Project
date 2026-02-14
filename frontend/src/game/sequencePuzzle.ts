@@ -9,11 +9,16 @@ export interface SequencePuzzle {
   answer: number; // correct value at missingIndex
 }
 
-// Very small deterministic pseudo-random generator from a date string.
-// In a later iteration we can swap this for Crypto-js based hashing,
-// but for now this keeps the concept simple and dependency-free.
-function seedFromDate(date: Date): number {
-  const iso = date.toISOString().slice(0, 10); // YYYY-MM-DD
+function toLocalIso(date: Date): string {
+  const y = date.getFullYear();
+  const m = date.getMonth() + 1;
+  const d = date.getDate();
+  return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+}
+
+// Very small deterministic pseudo-random generator from a date string (YYYY-MM-DD).
+// Uses the same date string as the app's "today" (local date) so puzzle and progress stay in sync.
+function seedFromIsoDate(iso: string): number {
   let hash = 0;
   for (let i = 0; i < iso.length; i += 1) {
     hash = (hash * 31 + iso.charCodeAt(i)) >>> 0;
@@ -23,8 +28,10 @@ function seedFromDate(date: Date): number {
 
 // Generate a simple arithmetic progression puzzle like:
 // 2, 5, 8, ?, 14
-export function generateDailySequencePuzzle(date: Date): SequencePuzzle {
-  const seed = seedFromDate(date);
+// dateIso: YYYY-MM-DD in local time (same as getTodayIsoDate() so the puzzle matches "today").
+export function generateDailySequencePuzzle(dateOrIso: Date | string): SequencePuzzle {
+  const iso = typeof dateOrIso === 'string' ? dateOrIso : toLocalIso(dateOrIso);
+  const seed = seedFromIsoDate(iso);
 
   // Derive deterministic parameters from the seed.
   const base = 1 + (seed % 10); // 1..10
