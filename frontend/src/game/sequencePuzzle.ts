@@ -9,11 +9,6 @@ export interface SequencePuzzle {
   answer: number; // correct value at missingIndex
 }
 
-export interface PuzzleValidationResult {
-  isCorrect: boolean;
-  score: number;
-}
-
 // Very small deterministic pseudo-random generator from a date string.
 // In a later iteration we can swap this for Crypto-js based hashing,
 // but for now this keeps the concept simple and dependency-free.
@@ -51,18 +46,14 @@ export function generateDailySequencePuzzle(date: Date): SequencePuzzle {
   };
 }
 
-// Validate a user's guess and compute a simple score.
-// For now:
-// - Correct: 10 points.
-// - Incorrect: 0 points.
+// Validate a user's guess.
+// Scoring is handled at the UI layer so that it can
+// also take hints, time taken, etc. into account.
 export function validateSequenceAnswer(
   puzzle: SequencePuzzle,
   guess: number,
-): PuzzleValidationResult {
+): boolean {
   const isCorrect = guess === puzzle.answer;
-  return {
-    isCorrect,
-    score: isCorrect ? 10 : 0,
-  };
+  return isCorrect;
 }
 
