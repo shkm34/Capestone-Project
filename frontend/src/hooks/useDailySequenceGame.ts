@@ -4,13 +4,9 @@ import {
   validateSequenceAnswer,
   type SequencePuzzle,
 } from '../game/sequencePuzzle';
-import {
-  computeStreak,
-  getTodayIsoDate,
-  loadDailyMeta,
-  saveDailyMeta,
-  type DailyMeta,
-} from '../state/dailyMeta';
+import { getTodayIsoDate } from '../utils/dateUtils';
+import { computeStreak } from '../utils/streakUtils';
+import { loadDailyMeta, saveDailyMeta, type DailyMeta } from '../state/dailyMeta';
 
 export const useDailySequenceGame = () => {
   const [puzzle, setPuzzle] = useState<SequencePuzzle | null>(null);
