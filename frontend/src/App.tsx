@@ -1,10 +1,23 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { AppHeader } from './components/AppHeader';
 import { HintBanner } from './components/HintBanner';
 import { ResultBanner } from './components/ResultBanner';
 import { useDailySequenceGame } from './hooks/useDailySequenceGame';
+import { store, initStorePersistence } from './store';
+import { flushPendingScores, ensureUserId } from './store/thunks/syncThunks';
 
 const App: React.FC = () => {
+  useEffect(() => {
+    initStorePersistence().then(() => {
+      store.dispatch(flushPendingScores());
+      store.dispatch(ensureUserId());
+    });
+    const onOnline = () => {
+      store.dispatch(flushPendingScores());
+    };
+    window.addEventListener('online', onOnline);
+    return () => window.removeEventListener('online', onOnline);
+  }, []);
   const {
     isLoading,
     visibleSequence,

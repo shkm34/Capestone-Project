@@ -1,37 +1,33 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useDispatch, useSelector } from 'react-redux';
 import {
   generateDailySequencePuzzle,
   validateSequenceAnswer,
   type SequencePuzzle,
 } from '../game/sequencePuzzle';
 import { getTodayIsoDate } from '../utils/dateUtils';
-import { computeStreak } from '../utils/streakUtils';
-import { loadDailyMeta, saveDailyMeta, type DailyMeta } from '../state/dailyMeta';
+import { markDaySolved, markHintUsed } from '../store/slices/progressSlice';
+import { submitOrEnqueueScore } from '../store/thunks/syncThunks';
+import type { AppDispatch, RootState } from '../store';
 
 export const useDailySequenceGame = () => {
+  const dispatch = useDispatch<AppDispatch>();
+  const progress = useSelector((state: RootState) => state.progress);
+  const todayIso = getTodayIsoDate();
+  const todayMeta = progress.completedByDate[todayIso];
+
   const [puzzle, setPuzzle] = useState<SequencePuzzle | null>(null);
   const [input, setInput] = useState('');
   const [isCorrect, setIsCorrect] = useState<boolean | null>(null);
   const [score, setScore] = useState<number | null>(null);
-  const [hasSolvedToday, setHasSolvedToday] = useState(false);
-  const [hasUsedHintToday, setHasUsedHintToday] = useState(false);
   const [hintText, setHintText] = useState<string | null>(null);
-  const [streak, setStreak] = useState(0);
+
+  const hasSolvedToday = todayMeta?.solved ?? false;
+  const hasUsedHintToday = todayMeta?.usedHint ?? false;
+  const streak = progress.streak;
 
   useEffect(() => {
-    const dailyPuzzle = generateDailySequencePuzzle(new Date());
-    setPuzzle(dailyPuzzle);
-
-    const storedMeta = loadDailyMeta();
-    const todayIso = getTodayIsoDate();
-    const todayMeta = storedMeta[todayIso];
-
-    if (todayMeta) {
-      setHasSolvedToday(todayMeta.solved);
-      setHasUsedHintToday(todayMeta.usedHint);
-    }
-
-    setStreak(computeStreak(storedMeta));
+    setPuzzle(generateDailySequencePuzzle(new Date()));
   }, []);
 
   const visibleSequence = useMemo(
@@ -43,8 +39,6 @@ export const useDailySequenceGame = () => {
         : [],
     [puzzle],
   );
-
-  const todayIso = getTodayIsoDate();
 
   const handleSubmit: React.FormEventHandler<HTMLFormElement> = (event) => {
     event.preventDefault();
@@ -64,16 +58,16 @@ export const useDailySequenceGame = () => {
     const finalScore = correct ? (hasUsedHintToday ? 6 : baseScore) : 0;
     setScore(finalScore);
 
-    const meta = loadDailyMeta();
-    const todayMeta: DailyMeta = {
-      solved: correct ? true : meta[todayIso]?.solved ?? false,
-      usedHint: hasUsedHintToday,
-    };
-    meta[todayIso] = todayMeta;
-    saveDailyMeta(meta);
-
-    setHasSolvedToday(todayMeta.solved);
-    setStreak(computeStreak(meta));
+    if (correct) {
+      dispatch(markDaySolved({ date: todayIso, usedHint: hasUsedHintToday }));
+      dispatch(
+        submitOrEnqueueScore({
+          date: todayIso,
+          puzzleId: 'sequence',
+          score: finalScore,
+        })
+      );
+    }
   };
 
   const handleShowHint = () => {
@@ -88,13 +82,7 @@ export const useDailySequenceGame = () => {
       setHintText('Look for a consistent numerical pattern between terms.');
     }
 
-    const meta = loadDailyMeta();
-    const existing = meta[todayIso] ?? { solved: false, usedHint: false };
-    const updated: DailyMeta = { ...existing, usedHint: true };
-    meta[todayIso] = updated;
-    saveDailyMeta(meta);
-
-    setHasUsedHintToday(true);
+    dispatch(markHintUsed({ date: todayIso }));
   };
 
   const isLoading = !puzzle;
@@ -115,4 +103,3 @@ export const useDailySequenceGame = () => {
     handleShowHint,
   };
 };
-
