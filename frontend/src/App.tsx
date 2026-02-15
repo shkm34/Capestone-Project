@@ -1,56 +1,128 @@
-import React, { useEffect } from 'react';
-import { BrowserRouter, Routes, Route, Link } from 'react-router-dom';
+import React, { useEffect, useState } from 'react';
+import { BrowserRouter, Routes, Route, Link, useNavigate } from 'react-router-dom';
+import { useDispatch, useSelector } from 'react-redux';
+import type { AppDispatch, RootState } from './store';
 import { PlayPage } from './pages/PlayPage';
 import { ProfilePage } from './pages/ProfilePage';
+import { SignInPage } from './pages/SignInPage';
 import { store, initStorePersistence } from './store';
-import { flushPendingScores, ensureUserId } from './store/thunks/syncThunks';
+import { setUser, signOut as signOutAction } from './store/slices/authSlice';
+import { rehydrateProgress } from './store/slices/progressSlice';
+import { rehydrateSync, type SyncState } from './store/slices/syncSlice';
+import { clearUserProfile, rehydrateUserProfile } from './store/slices/userProfileSlice';
+import { flushPendingScores } from './store/thunks/syncThunks';
+import { getSession, signOut as apiSignOut, setStoredToken } from './services/api';
 
-const App: React.FC = () => {
+function AppContent(): React.ReactElement {
+  const dispatch = useDispatch<AppDispatch>();
+  const navigate = useNavigate();
+  const userId = useSelector((s: RootState) => s.auth.userId);
+  const [sessionChecked, setSessionChecked] = useState(false);
+
   useEffect(() => {
-    initStorePersistence().then(() => {
-      store.dispatch(flushPendingScores());
-      store.dispatch(ensureUserId());
-    });
-    const onOnline = () => {
-      store.dispatch(flushPendingScores());
+    let cancelled = false;
+    (async () => {
+      const saved = await initStorePersistence();
+      const hash = window.location.hash;
+      if (hash.startsWith('#token=')) {
+        const token = decodeURIComponent(hash.slice(7));
+        setStoredToken(token);
+        window.history.replaceState({}, '', window.location.pathname + window.location.search);
+      }
+      const data = await getSession();
+      if (cancelled) return;
+      if (data?.user) {
+        dispatch(setUser({ userId: data.user.id, email: data.user.email }));
+        const sessionUserId = String(data.user.id);
+        const persistedUserId = saved?.auth?.userId != null ? String(saved.auth.userId) : null;
+        if (saved && persistedUserId !== null && persistedUserId === sessionUserId) {
+          dispatch(rehydrateProgress(saved.progress));
+          dispatch(rehydrateSync(saved.sync as SyncState));
+          if (saved.userProfile) dispatch(rehydrateUserProfile(saved.userProfile));
+        } else {
+          dispatch(rehydrateProgress({ completedByDate: {}, streak: 0 }));
+          dispatch(rehydrateSync({ pendingScores: [], lastSyncAt: null }));
+          dispatch(clearUserProfile());
+        }
+        store.dispatch(flushPendingScores());
+      } else {
+        dispatch(signOutAction());
+      }
+      setSessionChecked(true);
+    })();
+    return () => {
+      cancelled = true;
     };
+  }, [dispatch]);
+
+  useEffect(() => {
+    const onOnline = () => store.dispatch(flushPendingScores());
     window.addEventListener('online', onOnline);
     return () => window.removeEventListener('online', onOnline);
   }, []);
 
+  const handleSignOut = async () => {
+    await apiSignOut();
+    dispatch(signOutAction());
+    navigate('/');
+  };
+
+  if (!sessionChecked) {
+    return (
+      <div className="min-h-screen bg-[#222222] text-[#F6F5F5] flex items-center justify-center">
+        <p className="text-[#D9E2FF]">Loading…</p>
+      </div>
+    );
+  }
+
+  if (!userId) {
+    return <SignInPage />;
+  }
+
   return (
-    <BrowserRouter>
-      <div className="min-h-screen bg-[#222222] text-[#F6F5F5] flex flex-col items-center px-4 py-6">
-        <nav className="w-full max-w-xl flex items-center justify-between mb-6">
+    <div className="min-h-screen bg-[#222222] text-[#F6F5F5] flex flex-col items-center px-4 py-6">
+      <nav className="w-full max-w-xl flex items-center justify-between mb-6">
+        <Link
+          to="/"
+          className="text-lg font-semibold text-[#FFFFFF] hover:text-[#DDF2FD] transition-colors"
+        >
+          Logic Looper
+        </Link>
+        <div className="flex items-center gap-4">
           <Link
             to="/"
-            className="text-lg font-semibold text-[#FFFFFF] hover:text-[#DDF2FD] transition-colors"
+            className="text-sm font-medium text-[#D9E2FF] hover:text-[#FFFFFF] transition-colors"
           >
-            Logic Looper
+            Play
           </Link>
-          <div className="flex gap-4">
-            <Link
-              to="/"
-              className="text-sm font-medium text-[#D9E2FF] hover:text-[#FFFFFF] transition-colors"
-            >
-              Play
-            </Link>
-            <Link
-              to="/profile"
-              className="text-sm font-medium text-[#D9E2FF] hover:text-[#FFFFFF] transition-colors"
-            >
-              Profile
-            </Link>
-          </div>
-        </nav>
+          <Link
+            to="/profile"
+            className="text-sm font-medium text-[#D9E2FF] hover:text-[#FFFFFF] transition-colors"
+          >
+            Profile
+          </Link>
+          <button
+            type="button"
+            onClick={handleSignOut}
+            className="text-sm font-medium text-[#D9E2FF] hover:text-[#FFFFFF] transition-colors"
+          >
+            Sign out
+          </button>
+        </div>
+      </nav>
 
-        <Routes>
-          <Route path="/" element={<PlayPage />} />
-          <Route path="/profile" element={<ProfilePage />} />
-        </Routes>
-      </div>
-    </BrowserRouter>
+      <Routes>
+        <Route path="/" element={<PlayPage key={userId ?? undefined} />} />
+        <Route path="/profile" element={<ProfilePage />} />
+      </Routes>
+    </div>
   );
-};
+}
+
+const App: React.FC = () => (
+  <BrowserRouter>
+    <AppContent />
+  </BrowserRouter>
+);
 
 export default App;

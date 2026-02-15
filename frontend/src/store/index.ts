@@ -14,8 +14,8 @@ export const store = configureStore({
   },
 });
 
-/** Load persisted state from IndexedDB and subscribe to save changes. Call once after creating store. */
-export function initStorePersistence(): Promise<void> {
+/** Load persisted state from IndexedDB and subscribe to save changes. Returns loaded blob for App to rehydrate after session. */
+export function initStorePersistence(): Promise<Awaited<ReturnType<typeof initPersistence>>> {
   return initPersistence(store);
 }
 

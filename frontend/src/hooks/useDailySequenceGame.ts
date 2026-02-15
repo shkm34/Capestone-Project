@@ -40,7 +40,7 @@ export const useDailySequenceGame = () => {
       puzzle
         ? puzzle.sequence.map((value, index) =>
             index === puzzle.missingIndex ? '?' : value,
-          )
+          ) 
         : [],
     [puzzle],
   );

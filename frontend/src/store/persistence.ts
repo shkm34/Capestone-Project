@@ -88,26 +88,18 @@ export type GetState = () => {
 };
 
 /**
- * 1. Load saved state from IndexedDB and put it in Redux.
- * 2. When Redux changes, save to IndexedDB after a short delay (debounce).
+ * 1. Load saved state from IndexedDB but do NOT dispatch yet (so we never write
+ *    "auth + empty progress" to IDB — the subscribe would overwrite good data).
+ * 2. Set up subscribe to save on Redux changes.
+ * 3. Return the loaded blob so App can set user from session and rehydrate progress
+ *    in one go before any save runs (see docs/offline-first-flow.md).
  */
 export async function initPersistence(store: {
   getState: GetState;
   dispatch: (a: unknown) => void;
   subscribe: (listener: () => void) => () => void;
-}): Promise<void> {
+}): Promise<LoadedState | null> {
   const saved = await loadFromIndexedDB();
-  if (saved) {
-    store.dispatch({ type: "auth/rehydrateAuth", payload: saved.auth });
-    store.dispatch({
-      type: "progress/rehydrateProgress",
-      payload: saved.progress,
-    });
-    store.dispatch({ type: "sync/rehydrateSync", payload: saved.sync });
-    if (saved.userProfile) {
-      store.dispatch({ type: "userProfile/rehydrateUserProfile", payload: saved.userProfile });
-    }
-  }
 
   store.subscribe(() => {
     if (saveTimer) clearTimeout(saveTimer);
@@ -122,4 +114,6 @@ export async function initPersistence(store: {
       }).catch((err) => console.warn("[persistence] save failed", err));
     }, SAVE_DELAY_MS);
   });
+
+  return saved;
 }
