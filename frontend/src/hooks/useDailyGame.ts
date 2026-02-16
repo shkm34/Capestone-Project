@@ -1,27 +1,21 @@
-/**
- * Legacy hook: sequence-only daily game.
- * Play page now uses useDailyGame() which rotates puzzle type by date.
- * Kept for reference or direct use in sequence-only contexts.
- */
 import { useEffect, useMemo, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import {
-  generateDailySequencePuzzle,
-  validateSequenceAnswer,
-  type SequencePuzzle,
-} from '../game/sequencePuzzle';
 import { getTodayIsoDate } from '../utils/dateUtils';
+import { getPuzzleTypeForDate } from '../utils/puzzleCycle';
+import { getPuzzleModule, type DailyPuzzle } from '../game/puzzleRegistry';
 import { markDaySolved, markHintUsed } from '../store/slices/progressSlice';
 import { submitOrEnqueueScore } from '../store/thunks/syncThunks';
 import type { AppDispatch, RootState } from '../store';
 
-export const useDailySequenceGame = () => {
+export const useDailyGame = () => {
   const dispatch = useDispatch<AppDispatch>();
   const progress = useSelector((state: RootState) => state.progress);
   const todayIso = getTodayIsoDate();
+  const puzzleType = getPuzzleTypeForDate(todayIso);
   const todayMeta = progress.completedByDate[todayIso];
+  const module = getPuzzleModule(puzzleType);
 
-  const [puzzle, setPuzzle] = useState<SequencePuzzle | null>(null);
+  const [puzzle, setPuzzle] = useState<DailyPuzzle | null>(null);
   const [input, setInput] = useState('');
   const [isCorrect, setIsCorrect] = useState<boolean | null>(null);
   const [score, setScore] = useState<number | null>(null);
@@ -31,23 +25,17 @@ export const useDailySequenceGame = () => {
   const hasUsedHintToday = todayMeta?.usedHint ?? false;
   const streak = progress.streak;
 
-  // Regenerate puzzle when the calendar day changes; use todayIso so puzzle and progress use the same "today".
   useEffect(() => {
-    setPuzzle(generateDailySequencePuzzle(todayIso));
+    setPuzzle(module.generate(todayIso) as DailyPuzzle);
     setInput('');
     setIsCorrect(null);
     setScore(null);
     setHintText(null);
-  }, [todayIso]);
+  }, [todayIso, puzzleType, module]);
 
-  const visibleSequence = useMemo(
-    () =>
-      puzzle
-        ? puzzle.sequence.map((value, index) =>
-            index === puzzle.missingIndex ? '?' : value,
-          ) 
-        : [],
-    [puzzle],
+  const displayText = useMemo(
+    () => (puzzle ? module.getDisplay(puzzle) : ''),
+    [puzzle, module]
   );
 
   const handleSubmit: React.FormEventHandler<HTMLFormElement> = (event) => {
@@ -61,7 +49,7 @@ export const useDailySequenceGame = () => {
       return;
     }
 
-    const correct = validateSequenceAnswer(puzzle, numericGuess);
+    const correct = module.validate(puzzle, numericGuess);
     setIsCorrect(correct);
 
     const baseScore = 10;
@@ -73,7 +61,7 @@ export const useDailySequenceGame = () => {
       dispatch(
         submitOrEnqueueScore({
           date: todayIso,
-          puzzleId: 'sequence',
+          puzzleId: puzzleType,
           score: finalScore,
         })
       );
@@ -82,16 +70,7 @@ export const useDailySequenceGame = () => {
 
   const handleShowHint = () => {
     if (hasUsedHintToday || !puzzle) return;
-
-    if (puzzle.sequence.length >= 2) {
-      const step = puzzle.sequence[1] - puzzle.sequence[0];
-      setHintText(
-        `Look at how much the sequence increases each time. The common difference here is ${step}.`,
-      );
-    } else {
-      setHintText('Look for a consistent numerical pattern between terms.');
-    }
-
+    setHintText(module.getHint(puzzle));
     dispatch(markHintUsed({ date: todayIso }));
   };
 
@@ -99,8 +78,9 @@ export const useDailySequenceGame = () => {
 
   return {
     isLoading,
+    puzzleType,
     puzzle,
-    visibleSequence,
+    displayText,
     input,
     setInput,
     isCorrect,

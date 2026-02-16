@@ -2,8 +2,15 @@ import React, { useCallback, useState } from 'react';
 import { AppHeader } from '../components/AppHeader';
 import { HintBanner } from '../components/HintBanner';
 import { ResultBanner } from '../components/ResultBanner';
-import { useDailySequenceGame } from '../hooks/useDailySequenceGame';
+import { useDailyGame } from '../hooks/useDailyGame';
 import { useAttemptTimer } from '../utils/timerUtils';
+
+const PUZZLE_TYPE_LABELS: Record<string, string> = {
+  sequence: "Sequence",
+  pattern: "Pattern",
+  binary: "Binary Logic",
+  deduction: "Deduction",
+};
 
 export const PlayPage: React.FC = () => {
   const [attemptStarted, setAttemptStarted] = useState(false);
@@ -11,7 +18,8 @@ export const PlayPage: React.FC = () => {
 
   const {
     isLoading,
-    visibleSequence,
+    puzzleType,
+    displayText,
     input,
     setInput,
     isCorrect,
@@ -22,7 +30,7 @@ export const PlayPage: React.FC = () => {
     streak,
     handleSubmit,
     handleShowHint,
-  } = useDailySequenceGame();
+  } = useDailyGame();
 
   const onStartAttempt = useCallback(() => {
     setAttemptStarted(true);
@@ -49,6 +57,7 @@ export const PlayPage: React.FC = () => {
 
   return (
     <div className="w-full max-w-xl space-y-6">
+      <p className="text-xs text-amber-400">Debug: puzzleType = {puzzleType}</p>
       <AppHeader streak={streak} />
 
       <section className="rounded-2xl border border-[#3D3B40] bg-[#190482] bg-opacity-40 p-6 space-y-4 relative">
@@ -65,18 +74,18 @@ export const PlayPage: React.FC = () => {
         )}
 
         <h2 className="text-sm font-medium text-[#DDF2FD]">
-          Today&apos;s Sequence
+          Today&apos;s {PUZZLE_TYPE_LABELS[puzzleType] ?? puzzleType}
         </h2>
 
         <div className={showBlurOverlay ? 'select-none blur-xs pointer-events-none' : ''}>
           <p className="text-lg font-semibold tracking-wide text-[#FFFFFF]">
-            {visibleSequence.join(', ')}
+            {displayText}
           </p>
 
           <p className="text-xs text-[#D9E2FF]">
-            The numbers follow a consistent pattern. Fill in the missing value
-            represented by{' '}
-            <span className="font-semibold text-[#F05537]">?</span>.
+            {puzzleType === 'sequence'
+              ? <>The numbers follow a consistent pattern. Fill in the missing value represented by <span className="font-semibold text-[#F05537]">?</span>.</>
+              : 'Enter your answer below.'}
           </p>
 
           <form className="space-y-3" onSubmit={onSubmit}>

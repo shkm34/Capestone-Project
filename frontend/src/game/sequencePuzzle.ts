@@ -60,7 +60,22 @@ export function validateSequenceAnswer(
   puzzle: SequencePuzzle,
   guess: number,
 ): boolean {
-  const isCorrect = guess === puzzle.answer;
-  return isCorrect;
+  return guess === puzzle.answer;
+}
+
+/** Hint text for the sequence puzzle (for registry API). */
+export function getSequenceHint(puzzle: SequencePuzzle): string {
+  if (puzzle.sequence.length >= 2) {
+    const step = puzzle.sequence[1] - puzzle.sequence[0];
+    return `Look at how much the sequence increases each time. The common difference here is ${step}.`;
+  }
+  return 'Look for a consistent numerical pattern between terms.';
+}
+
+/** Display string for UI: sequence with ? at missing index. */
+export function getSequenceDisplay(puzzle: SequencePuzzle): string {
+  return puzzle.sequence
+    .map((value, index) => (index === puzzle.missingIndex ? '?' : String(value)))
+    .join(', ');
 }
 
