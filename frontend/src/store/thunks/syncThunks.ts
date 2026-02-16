@@ -54,7 +54,6 @@ export function submitOrEnqueueScore(payload: SubmitOrEnqueuePayload): AppThunk 
         return;
       }
       await apiSubmitScore({
-        userId: uid,
         date: payload.date,
         puzzleId: payload.puzzleId,
         score: payload.score,
@@ -85,7 +84,6 @@ export function flushPendingScores(): AppThunk {
       for (const p of pending) {
         try {
           await apiSubmitScore({
-            userId: uid,
             date: p.date,
             puzzleId: p.puzzleId,
             score: p.score,

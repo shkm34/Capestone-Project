@@ -65,6 +65,8 @@ export async function signOut(): Promise<void> {
 export interface CreateUserResponse {
   id: string;
   email: string | null;
+  /** JWT for this user (Option A: store and send as Bearer so guest can call protected endpoints). */
+  token?: string;
 }
 
 export async function createGuest(): Promise<CreateUserResponse> {
@@ -75,11 +77,13 @@ export async function createGuest(): Promise<CreateUserResponse> {
     credentials: 'include',
   });
   if (!res.ok) throw new Error(`createGuest failed: ${res.status}`);
-  return res.json() as Promise<CreateUserResponse>;
+  const data = (await res.json()) as CreateUserResponse;
+  if (data.token) setStoredToken(data.token);
+  return data;
 }
 
+/** Score payload: userId is inferred from auth (Bearer token), not sent in body. */
 export interface SubmitScoreBody {
-  userId: string;
   date: string;
   puzzleId: string;
   score: number;

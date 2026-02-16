@@ -1,5 +1,9 @@
-import React, { useEffect } from 'react';
-import { getSignInWithGoogleUrl } from '../services/api';
+import React, { useEffect, useState } from 'react';
+import { useDispatch } from 'react-redux';
+import { useNavigate } from 'react-router-dom';
+import { getSignInWithGoogleUrl, createGuest } from '../services/api';
+import type { AppDispatch } from '../store';
+import { setGuest } from '../store/slices/authSlice';
 
 const ERROR_MESSAGES: Record<string, string> = {
   missing_code: 'Sign-in was cancelled or invalid.',
@@ -10,7 +14,11 @@ const ERROR_MESSAGES: Record<string, string> = {
 };
 
 export const SignInPage: React.FC = () => {
-  const [errorCode, setErrorCode] = React.useState<string | null>(null);
+  const [errorCode, setErrorCode] = useState<string | null>(null);
+  const [guestError, setGuestError] = useState<string | null>(null);
+  const [guestLoading, setGuestLoading] = useState(false);
+  const dispatch = useDispatch<AppDispatch>();
+  const navigate = useNavigate();
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -23,6 +31,20 @@ export const SignInPage: React.FC = () => {
 
   const handleSignIn = () => {
     window.location.href = getSignInWithGoogleUrl();
+  };
+
+  const handlePlayAsGuest = async () => {
+    setGuestError(null);
+    setGuestLoading(true);
+    try {
+      const user = await createGuest();
+      dispatch(setGuest({ userId: user.id }));
+      navigate('/');
+    } catch {
+      setGuestError('Could not start guest session. Please try again.');
+    } finally {
+      setGuestLoading(false);
+    }
   };
 
   const errorMessage = errorCode ? ERROR_MESSAGES[errorCode] ?? 'Something went wrong.' : null;
@@ -64,6 +86,19 @@ export const SignInPage: React.FC = () => {
           </svg>
           Sign in with Google
         </button>
+        <button
+          type="button"
+          onClick={handlePlayAsGuest}
+          disabled={guestLoading}
+          className="w-full rounded-lg border border-[#D9E2FF] px-4 py-3 text-sm font-medium text-[#D9E2FF] hover:bg-[#2a2a2a] transition-colors disabled:opacity-50"
+        >
+          {guestLoading ? 'Starting…' : 'Play as guest'}
+        </button>
+        {guestError && (
+          <p className="text-sm text-[#F05537]" role="alert">
+            {guestError}
+          </p>
+        )}
       </div>
     </div>
   );

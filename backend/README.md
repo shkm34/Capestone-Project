@@ -14,9 +14,9 @@ Express API with PostgreSQL (Prisma) for users and daily scores.
 ### Other
 
 - **GET /health** – Returns `{ status, db: "connected"|"disconnected", timestamp }`. Use for readiness checks.
-- **POST /api/users** – Create user. Body: `{ email? }`. Returns created user (guest if no email).
+- **POST /api/users** – Create user. Body: `{ email? }`. Returns created user plus `token` (JWT). **Option A (guest):** guests get a JWT in the response; the client stores it and sends `Authorization: Bearer <token>` so they can call protected endpoints (e.g. submit score) like signed-in users.
 - **GET /api/users/:id** – Get user by id with stats and recent daily scores.
-- **POST /api/score** – Create or update daily score. Body: `{ userId, date, puzzleId, score, timeTakenMs?, streak? }`. Streak is taken from the client (already computed); server stores it and does not recalculate. Returns `{ accepted: true, streak }`.
+- **POST /api/score** – **Requires auth** (Bearer token). Create or update daily score for the authenticated user. Body: `{ date, puzzleId, score, timeTakenMs?, streak? }`. User id comes from the JWT, not the body. Returns `{ accepted: true, streak }`.
 - **GET /api/score** – Get one score. Query: `userId`, `date` (YYYY-MM-DD).
 - **GET /api/score/leaderboard** – Leaderboard for a date. Query: `date` (required), `limit` (default 50, max 100).
 

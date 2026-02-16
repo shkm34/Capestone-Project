@@ -7,9 +7,9 @@ import { ProfilePage } from './pages/ProfilePage';
 import { SignInPage } from './pages/SignInPage';
 import type { UserProfile } from './services/api';
 import { store, initStorePersistence } from './store';
-import { setUser, signOut as signOutAction } from './store/slices/authSlice';
+import { setUser, signOut as signOutAction, rehydrateAuth } from './store/slices/authSlice';
 import { rehydrateProgress } from './store/slices/progressSlice';
-import { rehydrateSync } from './store/slices/syncSlice';
+import { rehydrateSync, type PendingScore } from './store/slices/syncSlice';
 import { fetchUserProfile, flushPendingScores } from './store/thunks/syncThunks';
 import { getSession, signOut as apiSignOut, setStoredToken } from './services/api';
 import { computeStreak } from './utils/streakUtils';
@@ -33,7 +33,7 @@ function AppContent(): React.ReactElement {
     let cancelled = false;
 
     (async () => {
-      await initStorePersistence();
+      const saved = await initStorePersistence();
       if (cancelled) return;
 
       const hash = window.location.hash;
@@ -46,7 +46,25 @@ function AppContent(): React.ReactElement {
       if (cancelled) return;
 
       if (!data?.user) {
-        dispatch(signOutAction());
+        if (saved?.auth?.userId && saved.auth.isGuest) {
+          dispatch(rehydrateAuth(saved.auth));
+          dispatch(rehydrateProgress(saved.progress ?? { completedByDate: {}, streak: 0 }));
+          dispatch(
+            rehydrateSync({
+              pendingScores: (saved.sync?.pendingScores ?? []) as PendingScore[],
+              lastSyncAt: saved.sync?.lastSyncAt ?? null,
+            })
+          );
+          await store.dispatch(fetchUserProfile());
+          if (cancelled) return;
+          const user = store.getState().userProfile.user;
+          if (user) {
+            dispatch(rehydrateProgress(progressFromProfile(user)));
+          }
+          store.dispatch(flushPendingScores());
+        } else {
+          dispatch(signOutAction());
+        }
         setSessionChecked(true);
         return;
       }

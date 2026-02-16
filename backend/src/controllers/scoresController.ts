@@ -1,14 +1,15 @@
-import { Request, Response } from 'express';
+import { Response } from 'express';
 import { prisma } from '../db.js';
+import type { AuthenticatedRequest } from '../middleware/auth.js';
 
-/** Create or update daily score. Body: userId, date, puzzleId, score, timeTakenMs?, streak?.
- *  Streak is sent from the client (already computed); we store it, no server-side recalculation. */
-export async function submitScore(req: Request, res: Response): Promise<void> {
+/** Create or update daily score. Requires auth (userId from JWT). Body: date, puzzleId, score, timeTakenMs?, streak?. */
+export async function submitScore(req: AuthenticatedRequest, res: Response): Promise<void> {
   try {
-    const { userId, date, puzzleId, score, timeTakenMs, streak } = req.body ?? {};
-    if (!userId || !date || puzzleId == null || score == null) {
+    const userId = req.user.id;
+    const { date, puzzleId, score, timeTakenMs, streak } = req.body ?? {};
+    if (!date || puzzleId == null || score == null) {
       res.status(400).json({
-        error: 'Missing required fields: userId, date, puzzleId, score',
+        error: 'Missing required fields: date, puzzleId, score',
       });
       return;
     }
