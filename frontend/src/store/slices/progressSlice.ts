@@ -1,4 +1,5 @@
 import { createSlice } from '@reduxjs/toolkit';
+import { normalizeDateKey } from '../../utils/dateUtils';
 import { computeStreak } from '../../utils/streakUtils';
 
 export interface DayMeta {
@@ -45,9 +46,15 @@ export const progressSlice = createSlice({
     },
     rehydrateProgress: (_, action: { payload: ProgressState }) => {
       const p = action.payload;
+      const raw = p.completedByDate ?? {};
+      const completedByDate: Record<string, DayMeta> = {};
+      for (const [key, meta] of Object.entries(raw)) {
+        const normalizedKey = normalizeDateKey(key);
+        completedByDate[normalizedKey] = meta;
+      }
       return {
-        completedByDate: p.completedByDate ?? {},
-        streak: p.streak ?? nextStreak(p.completedByDate ?? {}),
+        completedByDate,
+        streak: p.streak ?? nextStreak(completedByDate),
       };
     },
   },

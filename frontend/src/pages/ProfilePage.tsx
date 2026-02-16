@@ -8,6 +8,7 @@ export const ProfilePage: React.FC = () => {
   const dispatch = useDispatch<AppDispatch>();
   const userId = useSelector((s: RootState) => s.auth.userId);
   const { user, lastFetchedAt, fetchError } = useSelector((s: RootState) => s.userProfile);
+  const streak = useSelector((s: RootState) => s.progress.streak);
 
   useEffect(() => {
     if (userId) dispatch(fetchUserProfile());
@@ -67,7 +68,7 @@ export const ProfilePage: React.FC = () => {
           <div className="flex gap-6">
             <div>
               <p className="text-xs uppercase tracking-wide text-[#BFCFE7]">Streak</p>
-              <p className="text-lg font-semibold text-[#F05537]">{user.streakCount} days</p>
+              <p className="text-lg font-semibold text-[#F05537]">{streak} days</p>
             </div>
             <div>
               <p className="text-xs uppercase tracking-wide text-[#BFCFE7]">Total points</p>

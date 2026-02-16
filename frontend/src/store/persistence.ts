@@ -92,7 +92,7 @@ export type GetState = () => {
  *    "auth + empty progress" to IDB — the subscribe would overwrite good data).
  * 2. Set up subscribe to save on Redux changes.
  * 3. Return the loaded blob so App can set user from session and rehydrate progress
- *    in one go before any save runs (see docs/offline-first-flow.md).
+ *    in one go before any save runs.
  */
 export async function initPersistence(store: {
   getState: GetState;

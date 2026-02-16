@@ -5,13 +5,23 @@ import type { AppDispatch, RootState } from './store';
 import { PlayPage } from './pages/PlayPage';
 import { ProfilePage } from './pages/ProfilePage';
 import { SignInPage } from './pages/SignInPage';
+import type { UserProfile } from './services/api';
 import { store, initStorePersistence } from './store';
 import { setUser, signOut as signOutAction } from './store/slices/authSlice';
 import { rehydrateProgress } from './store/slices/progressSlice';
-import { rehydrateSync, type SyncState } from './store/slices/syncSlice';
-import { clearUserProfile, rehydrateUserProfile } from './store/slices/userProfileSlice';
-import { flushPendingScores } from './store/thunks/syncThunks';
+import { rehydrateSync } from './store/slices/syncSlice';
+import { fetchUserProfile, flushPendingScores } from './store/thunks/syncThunks';
 import { getSession, signOut as apiSignOut, setStoredToken } from './services/api';
+import { computeStreak } from './utils/streakUtils';
+
+/** Build progress from API profile. Streak is derived from completedByDate (single source of truth). */
+function progressFromProfile(user: UserProfile): { completedByDate: Record<string, { solved: boolean; usedHint: boolean }>; streak: number } {
+  const completedByDate: Record<string, { solved: boolean; usedHint: boolean }> = {};
+  for (const s of user.dailyScores) {
+    if (!completedByDate[s.date]) completedByDate[s.date] = { solved: true, usedHint: false };
+  }
+  return { completedByDate, streak: computeStreak(completedByDate) };
+}
 
 function AppContent(): React.ReactElement {
   const dispatch = useDispatch<AppDispatch>();
@@ -21,38 +31,43 @@ function AppContent(): React.ReactElement {
 
   useEffect(() => {
     let cancelled = false;
+
     (async () => {
-      const saved = await initStorePersistence();
+      await initStorePersistence();
+      if (cancelled) return;
+
       const hash = window.location.hash;
       if (hash.startsWith('#token=')) {
-        const token = decodeURIComponent(hash.slice(7));
-        setStoredToken(token);
+        setStoredToken(decodeURIComponent(hash.slice(7)));
         window.history.replaceState({}, '', window.location.pathname + window.location.search);
       }
+
       const data = await getSession();
       if (cancelled) return;
-      if (data?.user) {
-        dispatch(setUser({ userId: data.user.id, email: data.user.email }));
-        const sessionUserId = String(data.user.id);
-        const persistedUserId = saved?.auth?.userId != null ? String(saved.auth.userId) : null;
-        if (saved && persistedUserId !== null && persistedUserId === sessionUserId) {
-          dispatch(rehydrateProgress(saved.progress));
-          dispatch(rehydrateSync(saved.sync as SyncState));
-          if (saved.userProfile) dispatch(rehydrateUserProfile(saved.userProfile));
-        } else {
-          dispatch(rehydrateProgress({ completedByDate: {}, streak: 0 }));
-          dispatch(rehydrateSync({ pendingScores: [], lastSyncAt: null }));
-          dispatch(clearUserProfile());
-        }
-        store.dispatch(flushPendingScores());
-      } else {
+
+      if (!data?.user) {
         dispatch(signOutAction());
+        setSessionChecked(true);
+        return;
       }
+
+      dispatch(setUser({ userId: data.user.id, email: data.user.email }));
+      await store.dispatch(fetchUserProfile());
+      if (cancelled) return;
+
+      const user = store.getState().userProfile.user;
+      if (user) {
+        dispatch(rehydrateProgress(progressFromProfile(user)));
+      } else {
+        dispatch(rehydrateProgress({ completedByDate: {}, streak: 0 }));
+      }
+      dispatch(rehydrateSync({ pendingScores: [], lastSyncAt: null }));
+
+      store.dispatch(flushPendingScores());
       setSessionChecked(true);
     })();
-    return () => {
-      cancelled = true;
-    };
+
+    return () => { cancelled = true; };
   }, [dispatch]);
 
   useEffect(() => {

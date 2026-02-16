@@ -20,3 +20,16 @@ export function previousIsoDate(dateIso: string): string {
   date.setDate(date.getDate() - 1);
   return getLocalIsoDate(date);
 }
+
+/**
+ * Normalize a date string to YYYY-MM-DD (padded month/day).
+ * Use when reading completedByDate from IDB or API so keys always match getTodayIsoDate().
+ */
+export function normalizeDateKey(key: string): string {
+  const parts = key.trim().split('-').map((p) => parseInt(p, 10));
+  if (parts.length < 3 || parts.some((n) => Number.isNaN(n))) return key;
+  const [y, m, d] = parts;
+  const month = Math.max(1, Math.min(12, m));
+  const day = Math.max(1, Math.min(31, d));
+  return `${y}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+}
