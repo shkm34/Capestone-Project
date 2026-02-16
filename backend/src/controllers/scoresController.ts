@@ -1,6 +1,7 @@
 import { Response } from 'express';
 import { prisma } from '../db.js';
 import type { AuthenticatedRequest } from '../middleware/auth.js';
+import { isValidIsoDateString, isDateNotInFuture } from '../utils/dateUtils.js';
 
 /** Create or update daily score. Requires auth (userId from JWT). Body: date, puzzleId, score, timeTakenMs?, streak?. */
 export async function submitScore(req: AuthenticatedRequest, res: Response): Promise<void> {
@@ -10,6 +11,19 @@ export async function submitScore(req: AuthenticatedRequest, res: Response): Pro
     if (!date || puzzleId == null || score == null) {
       res.status(400).json({
         error: 'Missing required fields: date, puzzleId, score',
+      });
+      return;
+    }
+    const dateStr = String(date).trim();
+    if (!isValidIsoDateString(dateStr)) {
+      res.status(400).json({
+        error: 'Invalid date: must be YYYY-MM-DD and a valid calendar date',
+      });
+      return;
+    }
+    if (!isDateNotInFuture(dateStr)) {
+      res.status(400).json({
+        error: 'Date cannot be in the future',
       });
       return;
     }
@@ -25,11 +39,11 @@ export async function submitScore(req: AuthenticatedRequest, res: Response): Pro
 
     await prisma.dailyScore.upsert({
       where: {
-        userId_date: { userId, date: String(date) },
+        userId_date: { userId, date: dateStr },
       },
       create: {
         userId,
-        date: String(date),
+        date: dateStr,
         puzzleId: String(puzzleId),
         score: scoreNum,
         timeTakenMs: timeMs ?? undefined,
