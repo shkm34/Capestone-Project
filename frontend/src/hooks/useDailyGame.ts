@@ -38,7 +38,10 @@ export const useDailyGame = () => {
     [puzzle, module]
   );
 
-  const handleSubmit: React.FormEventHandler<HTMLFormElement> = (event) => {
+  const handleSubmit = (
+    event: React.FormEvent<HTMLFormElement>,
+    timeTakenMs?: number,
+  ) => {
     event.preventDefault();
     if (!puzzle) return;
 
@@ -63,7 +66,8 @@ export const useDailyGame = () => {
           date: todayIso,
           puzzleId: puzzleType,
           score: finalScore,
-        })
+          timeTakenMs,
+        }),
       );
     }
   };

@@ -17,3 +17,5 @@ backend/auth-config.json
 backend/node_modules/
 backend/dist/
 
+.env
+

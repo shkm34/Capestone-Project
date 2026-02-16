@@ -1,16 +1,10 @@
 // Stub for daily Deduction puzzle. Deterministic from date; same date → same puzzle.
 
+import { seedFromIsoDate } from './puzzleSeed';
+
 export interface DeductionPuzzle {
   answer: number;
   questionText: string;
-}
-
-function seedFromIsoDate(iso: string): number {
-  let hash = 0;
-  for (let i = 0; i < iso.length; i += 1) {
-    hash = (hash * 31 + iso.charCodeAt(i)) >>> 0;
-  }
-  return hash;
 }
 
 export function generateDailyDeductionPuzzle(dateIso: string): DeductionPuzzle {

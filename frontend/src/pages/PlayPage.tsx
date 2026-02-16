@@ -32,6 +32,8 @@ export const PlayPage: React.FC = () => {
     handleShowHint,
   } = useDailyGame();
 
+  
+
   const onStartAttempt = useCallback(() => {
     setAttemptStarted(true);
     timer.start();
@@ -39,7 +41,7 @@ export const PlayPage: React.FC = () => {
 
   const onSubmit = useCallback(
     (event: React.FormEvent<HTMLFormElement>) => {
-      handleSubmit(event);
+      handleSubmit(event, timer.elapsedSeconds * 1000);
       timer.stop();
     },
     [handleSubmit, timer]

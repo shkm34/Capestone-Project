@@ -1,14 +1,87 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import type { AppDispatch, RootState } from '../store';
 import { fetchUserProfile } from '../store/thunks/syncThunks';
+import { ThreeMonthHeatmap, type HeatmapActivity } from '../components/ThreeMonthHeatmap';
+import type { PersistedUserProfile } from '../store/persistence';
+import type { PendingScore } from '../store/slices/syncSlice';
+
+function buildHeatmapActivity(
+  completedByDate: Record<string, { solved: boolean; usedHint: boolean }>,
+  user: PersistedUserProfile | null,
+  pendingScores: PendingScore[],
+): HeatmapActivity[] {
+  const activityMap = new Map<string, HeatmapActivity>();
+
+  // Base from completedByDate (solved flag only).
+  for (const [date, meta] of Object.entries(completedByDate)) {
+    if (!meta.solved) continue;
+    activityMap.set(date, { date, level: 1, score: null, timeTakenMs: null });
+  }
+
+  // Enhance with best score/time from server profile.
+  if (user) {
+    for (const s of user.dailyScores) {
+      const existing = activityMap.get(s.date);
+      if (!existing) continue;
+
+      const bestScore = s.score;
+      let level: HeatmapActivity['level'] = existing.level;
+      if (bestScore <= 0) {
+        if (level < 1) level = 1;
+      } else if (bestScore < 10) {
+        if (level < 2) level = 2;
+      } else if (s.timeTakenMs != null && s.timeTakenMs < 60000) {
+        if (level < 4) level = 4;
+      } else {
+        if (level < 3) level = 3;
+      }
+
+      activityMap.set(s.date, {
+        date: s.date,
+        level,
+        score: s.score,
+        timeTakenMs: s.timeTakenMs,
+      });
+    }
+  }
+
+  // Include pending (offline) scores as well.
+  for (const p of pendingScores) {
+    const existing = activityMap.get(p.date);
+    if (!existing) continue;
+
+    const bestScore = p.score;
+    let level: HeatmapActivity['level'] = existing.level;
+    if (bestScore <= 0) {
+      if (level < 1) level = 1;
+    } else if (bestScore < 10) {
+      if (level < 2) level = 2;
+    } else if (p.timeTakenMs != null && p.timeTakenMs < 60000) {
+      if (level < 4) level = 4;
+    } else {
+      if (level < 3) level = 3;
+    }
+
+    activityMap.set(p.date, {
+      date: p.date,
+      level,
+      score: p.score,
+      timeTakenMs: p.timeTakenMs ?? null,
+    });
+  }
+
+  return Array.from(activityMap.values());
+}
 
 export const ProfilePage: React.FC = () => {
   const dispatch = useDispatch<AppDispatch>();
   const userId = useSelector((s: RootState) => s.auth.userId);
   const { user, lastFetchedAt, fetchError } = useSelector((s: RootState) => s.userProfile);
   const streak = useSelector((s: RootState) => s.progress.streak);
+  const completedByDate = useSelector((s: RootState) => s.progress.completedByDate);
+  const pendingScores = useSelector((s: RootState) => s.sync.pendingScores);
 
   useEffect(() => {
     if (userId) dispatch(fetchUserProfile());
@@ -16,6 +89,11 @@ export const ProfilePage: React.FC = () => {
 
   const loading = userId && !user && !fetchError;
   const error = Boolean(fetchError);
+
+  const heatmapActivity: HeatmapActivity[] = useMemo(
+    () => buildHeatmapActivity(completedByDate, user, pendingScores),
+    [completedByDate, user, pendingScores],
+  );
 
   return (
     <div className="w-full max-w-xl space-y-6">
@@ -89,7 +167,9 @@ export const ProfilePage: React.FC = () => {
           {user.lastPlayed && (
             <div>
               <p className="text-xs uppercase tracking-wide text-[#BFCFE7]">Last played</p>
-              <p className="text-sm text-[#D9E2FF]">{new Date(user.lastPlayed).toLocaleDateString()}</p>
+              <p className="text-sm text-[#D9E2FF]">
+                {new Date(user.lastPlayed).toLocaleDateString()}
+              </p>
             </div>
           )}
           {user.dailyScores.length > 0 && (
@@ -110,8 +190,16 @@ export const ProfilePage: React.FC = () => {
               Fetched {new Date(lastFetchedAt).toLocaleString()}
             </p>
           )}
+
+          <div className="pt-4 border-t border-[#3D3B40]">
+            <p className="text-xs uppercase tracking-wide text-[#BFCFE7] mb-2">
+              Last 3 months activity
+            </p>
+            <ThreeMonthHeatmap activity={heatmapActivity} />
+          </div>
         </section>
       )}
     </div>
   );
 };
+

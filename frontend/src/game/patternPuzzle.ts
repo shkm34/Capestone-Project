@@ -1,16 +1,10 @@
 // Stub for daily Pattern puzzle. Deterministic from date; same date → same puzzle.
 
+import { seedFromIsoDate } from './puzzleSeed';
+
 export interface PatternPuzzle {
   answer: number;
   questionText: string;
-}
-
-function seedFromIsoDate(iso: string): number {
-  let hash = 0;
-  for (let i = 0; i < iso.length; i += 1) {
-    hash = (hash * 31 + iso.charCodeAt(i)) >>> 0;
-  }
-  return hash;
 }
 
 export function generateDailyPatternPuzzle(dateIso: string): PatternPuzzle {
