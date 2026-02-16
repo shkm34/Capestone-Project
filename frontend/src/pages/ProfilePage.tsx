@@ -96,109 +96,188 @@ export const ProfilePage: React.FC = () => {
   );
 
   return (
-    <div className="w-full max-w-xl space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold tracking-tight text-[#FFFFFF]">
-          Your profile
-        </h1>
-        <Link
-          to="/"
-          className="text-sm font-medium text-[#DDF2FD] hover:text-[#FFFFFF]"
-        >
-          ← Play
-        </Link>
-      </div>
+    <div className="min-h-screen bg-slate-950 text-slate-100 flex justify-center px-4 py-6">
+      <div className="w-full max-w-3xl space-y-5">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-white">
+            Your Profile
+          </h1>
+          <Link
+            to="/"
+            className="inline-flex items-center gap-1.5 rounded-xl border border-slate-700 bg-slate-900/60 px-4 py-2 text-sm font-medium text-slate-200 hover:bg-slate-800 hover:text-white transition-colors"
+          >
+            <span>←</span> Play
+          </Link>
+        </div>
 
-      {!userId && (
-        <section className="rounded-2xl border border-[#3D3B40] bg-[#190482] bg-opacity-40 p-6">
-          <p className="text-[#D9E2FF]">
-            You&apos;re not signed in yet. Complete a puzzle or go online to get a
-            guest account; your profile will appear here.
-          </p>
-        </section>
-      )}
+        {/* Not signed in */}
+        {!userId && (
+          <section className="rounded-2xl border border-slate-800 bg-gradient-to-br from-slate-900 to-slate-950 p-6 sm:p-8">
+            <p className="text-slate-300 leading-relaxed">
+              You&apos;re not signed in yet. Complete a puzzle or go online to get a
+              guest account; your profile will appear here.
+            </p>
+          </section>
+        )}
 
-      {loading && (
-        <section className="rounded-2xl border border-[#3D3B40] bg-[#190482] bg-opacity-40 p-6">
-          <p className="text-[#D9E2FF]">Loading profile…</p>
-        </section>
-      )}
+        {/* Loading */}
+        {loading && (
+          <section className="rounded-2xl border border-slate-800 bg-gradient-to-br from-slate-900 to-slate-950 p-6 sm:p-8">
+            <p className="text-slate-300">Loading profile…</p>
+          </section>
+        )}
 
-      {error && (
-        <section className="rounded-2xl border border-[#3D3B40] bg-[#190482] bg-opacity-40 p-6">
-          <p className="text-[#F05537]">{fetchError}</p>
-          <p className="text-xs text-[#D9E2FF] mt-2">Try again when online.</p>
-        </section>
-      )}
+        {/* Error */}
+        {error && (
+          <section className="rounded-2xl border border-red-900/50 bg-gradient-to-br from-red-950/30 to-slate-950 p-6 sm:p-8">
+            <p className="text-red-400 font-medium">{fetchError}</p>
+            <p className="text-sm text-slate-400 mt-2">Try again when online.</p>
+          </section>
+        )}
 
-      {user && (
-        <section className="rounded-2xl border border-[#3D3B40] bg-[#190482] bg-opacity-40 p-6 space-y-4">
-          <div>
-            <p className="text-xs uppercase tracking-wide text-[#BFCFE7]">User ID</p>
-            <p className="text-sm font-mono text-[#F6F5F5] break-all">{user.id}</p>
-          </div>
-          {user.email && (
-            <div>
-              <p className="text-xs uppercase tracking-wide text-[#BFCFE7]">Email</p>
-              <p className="text-sm text-[#F6F5F5]">{user.email}</p>
+        {/* User profile content */}
+        {user && (
+          <div className="space-y-5">
+            {/* Stats cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* Streak card */}
+              <div className="rounded-2xl border border-slate-800 bg-gradient-to-br from-[#190482]/60 via-slate-900 to-slate-950 p-5 sm:p-6 shadow-lg">
+                <p className="text-xs uppercase tracking-wider text-slate-400 mb-2">
+                  Current Streak
+                </p>
+                <p className="text-3xl sm:text-4xl font-bold text-[#F05537]">
+                  {streak}
+                </p>
+                <p className="text-sm text-slate-400 mt-1">days</p>
+              </div>
+
+              {/* Total points card */}
+              <div className="rounded-2xl border border-slate-800 bg-gradient-to-br from-[#190482]/60 via-slate-900 to-slate-950 p-5 sm:p-6 shadow-lg">
+                <p className="text-xs uppercase tracking-wider text-slate-400 mb-2">
+                  Total Points
+                </p>
+                <p className="text-3xl sm:text-4xl font-bold text-[#DDF2FD]">
+                  {user.totalPoints}
+                </p>
+                <p className="text-sm text-slate-400 mt-1">all time</p>
+              </div>
             </div>
-          )}
-          <div className="flex gap-6">
-            <div>
-              <p className="text-xs uppercase tracking-wide text-[#BFCFE7]">Streak</p>
-              <p className="text-lg font-semibold text-[#F05537]">{streak} days</p>
-            </div>
-            <div>
-              <p className="text-xs uppercase tracking-wide text-[#BFCFE7]">Total points</p>
-              <p className="text-lg font-semibold text-[#DDF2FD]">{user.totalPoints}</p>
-            </div>
-          </div>
-          {user.stats && (
-            <div>
-              <p className="text-xs uppercase tracking-wide text-[#BFCFE7]">Stats</p>
-              <p className="text-sm text-[#D9E2FF]">
-                Puzzles solved: {user.stats.puzzlesSolved}
-                {user.stats.avgSolveTimeMs != null && (
-                  <> · Avg time: {Math.round(user.stats.avgSolveTimeMs / 1000)}s</>
+
+            {/* Additional stats */}
+            {user.stats && (
+              <section className="rounded-2xl border border-slate-800 bg-gradient-to-br from-slate-900 to-slate-950 p-5 sm:p-6">
+                <h2 className="text-sm font-semibold uppercase tracking-wider text-slate-300 mb-4">
+                  Statistics
+                </h2>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <p className="text-xs text-slate-400">Puzzles Solved</p>
+                    <p className="text-xl font-semibold text-white">
+                      {user.stats.puzzlesSolved}
+                    </p>
+                  </div>
+                  {user.stats.avgSolveTimeMs != null && (
+                    <div className="space-y-1">
+                      <p className="text-xs text-slate-400">Average Time</p>
+                      <p className="text-xl font-semibold text-white">
+                        {Math.round(user.stats.avgSolveTimeMs / 1000)}s
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </section>
+            )}
+
+            {/* Account info */}
+            <section className="rounded-2xl border border-slate-800 bg-gradient-to-br from-slate-900 to-slate-950 p-5 sm:p-6">
+              <h2 className="text-sm font-semibold uppercase tracking-wider text-slate-300 mb-4">
+                Account Information
+              </h2>
+              <div className="space-y-4">
+                <div>
+                  <p className="text-xs text-slate-400 mb-1">User ID</p>
+                  <p className="text-sm font-mono text-slate-200 break-all bg-slate-900/60 rounded-lg px-3 py-2 border border-slate-800">
+                    {user.id}
+                  </p>
+                </div>
+                {user.email && (
+                  <div>
+                    <p className="text-xs text-slate-400 mb-1">Email</p>
+                    <p className="text-sm text-slate-200">{user.email}</p>
+                  </div>
                 )}
-              </p>
-            </div>
-          )}
-          {user.lastPlayed && (
-            <div>
-              <p className="text-xs uppercase tracking-wide text-[#BFCFE7]">Last played</p>
-              <p className="text-sm text-[#D9E2FF]">
-                {new Date(user.lastPlayed).toLocaleDateString()}
-              </p>
-            </div>
-          )}
-          {user.dailyScores.length > 0 && (
-            <div>
-              <p className="text-xs uppercase tracking-wide text-[#BFCFE7] mb-2">Recent scores</p>
-              <ul className="space-y-1 text-sm text-[#D9E2FF]">
-                {user.dailyScores.slice(0, 10).map((s) => (
-                  <li key={`${s.date}-${s.puzzleId}`}>
-                    {s.date} — {s.puzzleId}: {s.score} pts
-                    {s.timeTakenMs != null && ` (${Math.round(s.timeTakenMs / 1000)}s)`}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-          {lastFetchedAt && (
-            <p className="text-[10px] text-[#BFCFE7]">
-              Fetched {new Date(lastFetchedAt).toLocaleString()}
-            </p>
-          )}
+                {user.lastPlayed && (
+                  <div>
+                    <p className="text-xs text-slate-400 mb-1">Last Played</p>
+                    <p className="text-sm text-slate-200">
+                      {new Date(user.lastPlayed).toLocaleDateString(undefined, {
+                        weekday: 'long',
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric',
+                      })}
+                    </p>
+                  </div>
+                )}
+              </div>
+            </section>
 
-          <div className="pt-4 border-t border-[#3D3B40]">
-            <p className="text-xs uppercase tracking-wide text-[#BFCFE7] mb-2">
-              Last 3 months activity
-            </p>
-            <ThreeMonthHeatmap activity={heatmapActivity} />
+            {/* Recent scores */}
+            {user.dailyScores.length > 0 && (
+              <section className="rounded-2xl border border-slate-800 bg-gradient-to-br from-slate-900 to-slate-950 p-5 sm:p-6">
+                <h2 className="text-sm font-semibold uppercase tracking-wider text-slate-300 mb-4">
+                  Recent Scores
+                </h2>
+                <div className="space-y-2">
+                  {user.dailyScores.slice(0, 10).map((s) => (
+                    <div
+                      key={`${s.date}-${s.puzzleId}`}
+                      className="flex items-center justify-between rounded-lg bg-slate-900/60 border border-slate-800 px-3 py-2 hover:bg-slate-900/80 transition-colors"
+                    >
+                      <div className="flex-1">
+                        <p className="text-sm font-medium text-white">
+                          {s.date}
+                        </p>
+                        <p className="text-xs text-slate-400 capitalize">
+                          {s.puzzleId}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        {s.timeTakenMs != null && (
+                          <span className="text-xs text-slate-400">
+                            {Math.round(s.timeTakenMs / 1000)}s
+                          </span>
+                        )}
+                        <span className="text-sm font-semibold text-[#DDF2FD]">
+                          {s.score} pts
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
+
+            {/* Heatmap */}
+            <section className="rounded-2xl border border-slate-800 bg-gradient-to-br from-slate-900 to-slate-950 p-5 sm:p-6">
+              <h2 className="text-sm font-semibold uppercase tracking-wider text-slate-300 mb-4">
+                Activity Heatmap
+              </h2>
+              <div className="rounded-xl bg-slate-950/60 border border-slate-800 p-4">
+                <ThreeMonthHeatmap activity={heatmapActivity} />
+              </div>
+            </section>
+
+            {/* Footer metadata */}
+            {lastFetchedAt && (
+              <p className="text-[10px] text-slate-500 text-center">
+                Last updated {new Date(lastFetchedAt).toLocaleString()}
+              </p>
+            )}
           </div>
-        </section>
-      )}
+        )}
+      </div>
     </div>
   );
 };
