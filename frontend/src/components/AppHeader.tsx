@@ -6,16 +6,8 @@ interface AppHeaderProps {
 
 export const AppHeader: React.FC<AppHeaderProps> = ({ streak }) => {
   return (
-    <header className="flex items-center justify-between">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight text-[#FFFFFF]">
-          Logic Looper
-        </h1>
-        <p className="text-xs text-[#D9E2FF]">
-          Daily Sequence Solver &mdash; Bluestock-inspired branding.
-        </p>
-      </div>
-      <div className="text-right">
+    <header className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="text-left">
         <p className="text-[11px] uppercase tracking-wide text-[#BFCFE7]">
           Current streak
         </p>

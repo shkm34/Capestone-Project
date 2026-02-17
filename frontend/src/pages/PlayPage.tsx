@@ -93,7 +93,7 @@ export const PlayPage: React.FC = () => {
           )}
 
           {/* Header row: puzzle type + timer */}
-          <div className="flex items-start justify-between gap-4">
+          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-4">
             <div className="space-y-0.5">
               <div className="flex flex-wrap items-center gap-2">
                 <span className="inline-flex items-center rounded-full bg-slate-900/70 px-3 py-1 text-[11px] font-medium uppercase tracking-wide text-slate-300 border border-slate-700/80">

@@ -26,13 +26,13 @@ export const ProfilePage: React.FC = () => {
     <div className="min-h-screen bg-slate-950 text-slate-100 flex justify-center px-4 py-6">
       <div className="w-full max-w-3xl space-y-5">
         {/* Header */}
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-white">
             Your Profile
           </h1>
           <Link
             to="/"
-            className="inline-flex items-center gap-1.5 rounded-xl border border-slate-700 bg-slate-900/60 px-4 py-2 text-sm font-medium text-slate-200 hover:bg-slate-800 hover:text-white transition-colors"
+            className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-slate-700 bg-slate-900/60 px-4 py-2 text-xs sm:text-sm font-medium text-slate-200 hover:bg-slate-800 hover:text-white transition-colors"
           >
             <span>←</span> Play
           </Link>
