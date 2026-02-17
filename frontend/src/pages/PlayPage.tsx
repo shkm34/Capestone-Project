@@ -1,9 +1,9 @@
-import React, { useCallback, useState } from 'react';
+import React, { useMemo } from 'react';
 import { AppHeader } from '../components/AppHeader';
 import { HintBanner } from '../components/HintBanner';
 import { ResultBanner } from '../components/ResultBanner';
 import { useDailyGame } from '../hooks/useDailyGame';
-import { useAttemptTimer } from '../utils/timerUtils';
+import { usePlayAttempt } from '../hooks/usePlayAttempt';
 
 const PUZZLE_TYPE_LABELS: Record<string, string> = {
   sequence: "Sequence",
@@ -13,8 +13,12 @@ const PUZZLE_TYPE_LABELS: Record<string, string> = {
 };
 
 export const PlayPage: React.FC = () => {
-  const [attemptStarted, setAttemptStarted] = useState(false);
-  const timer = useAttemptTimer();
+  const {
+    attemptStarted,
+    timerFormatted,
+    handleStartAttempt,
+    createSubmitHandler,
+  } = usePlayAttempt();
 
   const {
     isLoading,
@@ -34,17 +38,9 @@ export const PlayPage: React.FC = () => {
 
   
 
-  const onStartAttempt = useCallback(() => {
-    setAttemptStarted(true);
-    timer.start();
-  }, [timer]);
-
-  const onSubmit = useCallback(
-    (event: React.FormEvent<HTMLFormElement>) => {
-      handleSubmit(event, timer.elapsedSeconds * 1000);
-      timer.stop();
-    },
-    [handleSubmit, timer]
+  const onSubmit = useMemo(
+    () => createSubmitHandler(handleSubmit),
+    [createSubmitHandler, handleSubmit],
   );
 
   if (isLoading) {
@@ -65,8 +61,8 @@ export const PlayPage: React.FC = () => {
         <section
           className={`relative overflow-hidden rounded-3xl border p-5 sm:p-6 shadow-xl space-y-4 transition-colors ${
             hasSolvedToday
-              ? 'border-emerald-500/40 bg-gradient-to-br from-emerald-950/30 via-slate-900 to-slate-950'
-              : 'border-slate-800 bg-gradient-to-br from-[#190482] via-slate-900 to-slate-950'
+              ? 'border-emerald-500/40 bg-linear-to-br from-emerald-950/30 via-slate-900 to-slate-950'
+              : 'border-slate-800 bg-linear-to-br from-[#190482] via-slate-900 to-slate-950'
           }`}
         >
           {/* Already solved banner */}
@@ -124,7 +120,7 @@ export const PlayPage: React.FC = () => {
                   className="rounded-full bg-slate-900/70 px-3 py-1 text-sm font-mono text-[#DDF2FD] tabular-nums border border-slate-700/80"
                   aria-label="Time elapsed"
                 >
-                  {timer.formatted}
+                  {timerFormatted}
                 </span>
               </div>
             )}
@@ -226,7 +222,7 @@ export const PlayPage: React.FC = () => {
             >
               <button
                 type="button"
-                onClick={onStartAttempt}
+                  onClick={handleStartAttempt}
                 className="rounded-2xl bg-[#414BEA] px-6 py-2.5 text-sm sm:text-base font-semibold text-white hover:bg-[#525CEB] transition-colors shadow-xl"
               >
                 Start today&apos;s attempt

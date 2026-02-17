@@ -37,7 +37,7 @@ export const YearHeatmap: React.FC<YearHeatmapProps> = ({ activity }) => {
   return (
     <div className="w-full min-w-0 overflow-x-auto">
       <div
-        className="relative inline-flex flex-col gap-[2px] py-1 max-w-full"
+        className="relative inline-flex flex-col  py-1 max-w-full"
         onMouseLeave={clear}
       >
         <MonthLabelRow monthRanges={monthRanges} />
@@ -58,11 +58,11 @@ export const YearHeatmap: React.FC<YearHeatmapProps> = ({ activity }) => {
 function MonthLabelRow({ monthRanges }: { monthRanges: MonthRange[] }) {
   return (
     <div className="flex items-end gap-0 flex-nowrap w-fit mb-1">
-      <div className="w-10 flex-shrink-0" aria-hidden />
+      <div className="w-10 shrink-0" aria-hidden />
       {monthRanges.map((range, i) => (
         <div
           key={`${range.label}-${i}`}
-          className="flex-shrink-0 flex items-end justify-start pl-0.5"
+          className="shrink-0 flex items-end justify-start pl-0.5"
           style={{ width: (range.endWeekIdx - range.startWeekIdx) * WEEK_WIDTH }}
         >
           <span className="text-[11px] font-medium text-slate-400 leading-none pb-0.5">
@@ -86,12 +86,12 @@ function GridWithDayLabels({
       {grid.map((row, rowIdx) => (
         <div
           key={rowIdx}
-          className="flex gap-[2px] justify-start flex-nowrap w-fit items-center"
+          className="flex gap-0.5 justify-start flex-nowrap w-fit items-center"
         >
           <div className="w-10 shrink-0 flex items-center justify-end pr-2">
             <span className="text-[10px] font-medium text-slate-400">{DAY_LABELS[rowIdx]}</span>
           </div>
-          <div className="flex gap-[2px] flex-nowrap">
+          <div className="flex gap-0.5 flex-nowrap">
             {row.map((cell, colIdx) => (
               <HeatmapCell key={colIdx} cell={cell} onHover={onHover} />
             ))}

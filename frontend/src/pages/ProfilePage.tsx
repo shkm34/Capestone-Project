@@ -1,94 +1,21 @@
-import React, { useEffect, useMemo } from 'react';
+import React, { useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { useDispatch, useSelector } from 'react-redux';
-import type { AppDispatch, RootState } from '../store';
-import { fetchUserProfile } from '../store/thunks/syncThunks';
 import { YearHeatmap, type HeatmapActivity } from '../components/YearHeatmap';
-import type { PersistedUserProfile } from '../store/persistence';
-import type { PendingScore } from '../store/slices/syncSlice';
-
-function buildHeatmapActivity(
-  completedByDate: Record<string, { solved: boolean; usedHint: boolean }>,
-  user: PersistedUserProfile | null,
-  pendingScores: PendingScore[],
-): HeatmapActivity[] {
-  const activityMap = new Map<string, HeatmapActivity>();
-
-  // Base from completedByDate (solved flag only).
-  for (const [date, meta] of Object.entries(completedByDate)) {
-    if (!meta.solved) continue;
-    activityMap.set(date, { date, level: 1, score: null, timeTakenMs: null });
-  }
-
-  // Enhance with best score/time from server profile.
-  if (user) {
-    for (const s of user.dailyScores) {
-      const existing = activityMap.get(s.date);
-      if (!existing) continue;
-
-      const bestScore = s.score;
-      let level: HeatmapActivity['level'] = existing.level;
-      if (bestScore <= 0) {
-        if (level < 1) level = 1;
-      } else if (bestScore < 10) {
-        if (level < 2) level = 2;
-      } else if (s.timeTakenMs != null && s.timeTakenMs < 60000) {
-        if (level < 4) level = 4;
-      } else {
-        if (level < 3) level = 3;
-      }
-
-      activityMap.set(s.date, {
-        date: s.date,
-        level,
-        score: s.score,
-        timeTakenMs: s.timeTakenMs,
-      });
-    }
-  }
-
-  // Include pending (offline) scores as well.
-  for (const p of pendingScores) {
-    const existing = activityMap.get(p.date);
-    if (!existing) continue;
-
-    const bestScore = p.score;
-    let level: HeatmapActivity['level'] = existing.level;
-    if (bestScore <= 0) {
-      if (level < 1) level = 1;
-    } else if (bestScore < 10) {
-      if (level < 2) level = 2;
-    } else if (p.timeTakenMs != null && p.timeTakenMs < 60000) {
-      if (level < 4) level = 4;
-    } else {
-      if (level < 3) level = 3;
-    }
-
-    activityMap.set(p.date, {
-      date: p.date,
-      level,
-      score: p.score,
-      timeTakenMs: p.timeTakenMs ?? null,
-    });
-  }
-
-  return Array.from(activityMap.values());
-}
+import { useProfileData } from '../hooks/useProfileData';
+import { buildHeatmapActivity } from '../utils/heatmapActivity';
 
 export const ProfilePage: React.FC = () => {
-  const dispatch = useDispatch<AppDispatch>();
-  const userId = useSelector((s: RootState) => s.auth.userId);
-  const { user, lastFetchedAt, fetchError } = useSelector((s: RootState) => s.userProfile);
-  const streak = useSelector((s: RootState) => s.progress.streak);
-  const completedByDate = useSelector((s: RootState) => s.progress.completedByDate);
-  const pendingScores = useSelector((s: RootState) => s.sync.pendingScores);
-
-  useEffect(() => {
-    if (userId) dispatch(fetchUserProfile());
-  }, [dispatch, userId]);
-
-  const loading = userId && !user && !fetchError;
-  const error = Boolean(fetchError);
+  const {
+    userId,
+    user,
+    lastFetchedAt,
+    fetchError,
+    loading,
+    error,
+    streak,
+    completedByDate,
+    pendingScores,
+  } = useProfileData();
 
   const heatmapActivity: HeatmapActivity[] = useMemo(
     () => buildHeatmapActivity(completedByDate, user, pendingScores),
@@ -113,7 +40,7 @@ export const ProfilePage: React.FC = () => {
 
         {/* Not signed in */}
         {!userId && (
-          <section className="rounded-2xl border border-slate-800 bg-gradient-to-br from-slate-900 to-slate-950 p-6 sm:p-8">
+          <section className="rounded-2xl border border-slate-800 bg-linear-to-br from-slate-900 to-slate-950 p-6 sm:p-8">
             <p className="text-slate-300 leading-relaxed">
               You&apos;re not signed in yet. Complete a puzzle or go online to get a
               guest account; your profile will appear here.
@@ -123,14 +50,14 @@ export const ProfilePage: React.FC = () => {
 
         {/* Loading */}
         {loading && (
-          <section className="rounded-2xl border border-slate-800 bg-gradient-to-br from-slate-900 to-slate-950 p-6 sm:p-8">
+          <section className="rounded-2xl border border-slate-800 bg-linear-to-br from-slate-900 to-slate-950 p-6 sm:p-8">
             <p className="text-slate-300">Loading profile…</p>
           </section>
         )}
 
         {/* Error */}
         {error && (
-          <section className="rounded-2xl border border-red-900/50 bg-gradient-to-br from-red-950/30 to-slate-950 p-6 sm:p-8">
+          <section className="rounded-2xl border border-red-900/50 bg-linear-to-br from-red-950/30 to-slate-950 p-6 sm:p-8">
             <p className="text-red-400 font-medium">{fetchError}</p>
             <p className="text-sm text-slate-400 mt-2">Try again when online.</p>
           </section>
@@ -142,7 +69,7 @@ export const ProfilePage: React.FC = () => {
             {/* Stats cards */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {/* Streak card */}
-              <div className="rounded-2xl border border-slate-800 bg-gradient-to-br from-[#190482]/60 via-slate-900 to-slate-950 p-5 sm:p-6 shadow-lg">
+              <div className="rounded-2xl border border-slate-800 bg-linear-to-br from-[#190482]/60 via-slate-900 to-slate-950 p-5 sm:p-6 shadow-lg">
                 <p className="text-xs uppercase tracking-wider text-slate-400 mb-2">
                   Current Streak
                 </p>
@@ -153,7 +80,7 @@ export const ProfilePage: React.FC = () => {
               </div>
 
               {/* Total points card */}
-              <div className="rounded-2xl border border-slate-800 bg-gradient-to-br from-[#190482]/60 via-slate-900 to-slate-950 p-5 sm:p-6 shadow-lg">
+              <div className="rounded-2xl border border-slate-800 bg-linear-to-br from-[#190482]/60 via-slate-900 to-slate-950 p-5 sm:p-6 shadow-lg">
                 <p className="text-xs uppercase tracking-wider text-slate-400 mb-2">
                   Total Points
                 </p>
@@ -166,7 +93,7 @@ export const ProfilePage: React.FC = () => {
 
             {/* Additional stats */}
             {user.stats && (
-              <section className="rounded-2xl border border-slate-800 bg-gradient-to-br from-slate-900 to-slate-950 p-5 sm:p-6">
+              <section className="rounded-2xl border border-slate-800 bg-linear-to-br from-slate-900 to-slate-950 p-5 sm:p-6">
                 <h2 className="text-sm font-semibold uppercase tracking-wider text-slate-300 mb-4">
                   Statistics
                 </h2>
@@ -190,7 +117,7 @@ export const ProfilePage: React.FC = () => {
             )}
 
             {/* Account info */}
-            <section className="rounded-2xl border border-slate-800 bg-gradient-to-br from-slate-900 to-slate-950 p-5 sm:p-6">
+            <section className="rounded-2xl border border-slate-800 bg-linear-to-br from-slate-900 to-slate-950 p-5 sm:p-6">
               <h2 className="text-sm font-semibold uppercase tracking-wider text-slate-300 mb-4">
                 Account Information
               </h2>
@@ -225,7 +152,7 @@ export const ProfilePage: React.FC = () => {
 
             {/* Recent scores */}
             {user.dailyScores.length > 0 && (
-              <section className="rounded-2xl border border-slate-800 bg-gradient-to-br from-slate-900 to-slate-950 p-5 sm:p-6">
+              <section className="rounded-2xl border border-slate-800 bg-linear-to-br from-slate-900 to-slate-950 p-5 sm:p-6">
                 <h2 className="text-sm font-semibold uppercase tracking-wider text-slate-300 mb-4">
                   Recent Scores
                 </h2>
@@ -260,7 +187,7 @@ export const ProfilePage: React.FC = () => {
             )}
 
             {/* Heatmap — last 365 days */}
-            <section className="rounded-2xl border border-slate-800 bg-gradient-to-br from-slate-900 to-slate-950 p-5 sm:p-6 overflow-hidden">
+            <section className="rounded-2xl border border-slate-800 bg-linear-to-br from-slate-900 to-slate-950 p-5 sm:p-6 overflow-hidden">
               <h2 className="text-sm font-semibold uppercase tracking-wider text-slate-300 mb-4">
                 Activity (365 days)
               </h2>

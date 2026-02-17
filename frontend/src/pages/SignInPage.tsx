@@ -1,53 +1,15 @@
-import React, { useEffect, useState } from 'react';
-import { useDispatch } from 'react-redux';
-import { useNavigate } from 'react-router-dom';
-import { getSignInWithGoogleUrl, createGuest } from '../services/api';
-import type { AppDispatch } from '../store';
-import { setGuest } from '../store/slices/authSlice';
-
-const ERROR_MESSAGES: Record<string, string> = {
-  missing_code: 'Sign-in was cancelled or invalid.',
-  server_config: 'Server is not configured for Google sign-in.',
-  no_email: 'Google did not provide an email.',
-  userinfo_failed: 'Could not load your Google profile.',
-  callback_failed: 'Sign-in failed. Please try again.',
-};
+import React from 'react';
+import { getSignInWithGoogleUrl } from '../services/api';
+import { useSignInError } from '../hooks/useSignInError';
+import { useGuestSignIn } from '../hooks/useGuestSignIn';
 
 export const SignInPage: React.FC = () => {
-  const [errorCode, setErrorCode] = useState<string | null>(null);
-  const [guestError, setGuestError] = useState<string | null>(null);
-  const [guestLoading, setGuestLoading] = useState(false);
-  const dispatch = useDispatch<AppDispatch>();
-  const navigate = useNavigate();
-
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const error = params.get('error');
-    if (error) {
-      setErrorCode(error);
-      window.history.replaceState({}, '', window.location.pathname);
-    }
-  }, []);
+  const errorMessage = useSignInError();
+  const { guestError, guestLoading, handlePlayAsGuest } = useGuestSignIn();
 
   const handleSignIn = () => {
     window.location.href = getSignInWithGoogleUrl();
   };
-
-  const handlePlayAsGuest = async () => {
-    setGuestError(null);
-    setGuestLoading(true);
-    try {
-      const user = await createGuest();
-      dispatch(setGuest({ userId: user.id }));
-      navigate('/');
-    } catch {
-      setGuestError('Could not start guest session. Please try again.');
-    } finally {
-      setGuestLoading(false);
-    }
-  };
-
-  const errorMessage = errorCode ? ERROR_MESSAGES[errorCode] ?? 'Something went wrong.' : null;
 
   return (
     <div className="min-h-screen bg-[#222222] text-[#F6F5F5] flex flex-col items-center justify-center px-4">

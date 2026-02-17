@@ -1,98 +1,19 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { BrowserRouter, Routes, Route, Link, useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import type { AppDispatch, RootState } from './store';
 import { PlayPage } from './pages/PlayPage';
 import { ProfilePage } from './pages/ProfilePage';
 import { SignInPage } from './pages/SignInPage';
-import type { UserProfile } from './services/api';
-import { store, initStorePersistence } from './store';
-import { setUser, signOut as signOutAction, rehydrateAuth } from './store/slices/authSlice';
-import { rehydrateProgress } from './store/slices/progressSlice';
-import { rehydrateSync, type PendingScore } from './store/slices/syncSlice';
-import { fetchUserProfile, flushPendingScores } from './store/thunks/syncThunks';
-import { getSession, signOut as apiSignOut, setStoredToken } from './services/api';
-import { computeStreak } from './utils/streakUtils';
-
-/** Build progress from API profile. Streak is derived from completedByDate (single source of truth). */
-function progressFromProfile(user: UserProfile): { completedByDate: Record<string, { solved: boolean; usedHint: boolean }>; streak: number } {
-  const completedByDate: Record<string, { solved: boolean; usedHint: boolean }> = {};
-  for (const s of user.dailyScores) {
-    if (!completedByDate[s.date]) completedByDate[s.date] = { solved: true, usedHint: false };
-  }
-  return { completedByDate, streak: computeStreak(completedByDate) };
-}
+import { signOut as apiSignOut } from './services/api';
+import { signOut as signOutAction } from './store/slices/authSlice';
+import { useAppBootstrap } from './hooks/useAppBootstrap';
 
 function AppContent(): React.ReactElement {
   const dispatch = useDispatch<AppDispatch>();
   const navigate = useNavigate();
   const userId = useSelector((s: RootState) => s.auth.userId);
-  const [sessionChecked, setSessionChecked] = useState(false);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    (async () => {
-      const saved = await initStorePersistence();
-      if (cancelled) return;
-
-      const hash = window.location.hash;
-      if (hash.startsWith('#token=')) {
-        setStoredToken(decodeURIComponent(hash.slice(7)));
-        window.history.replaceState({}, '', window.location.pathname + window.location.search);
-      }
-
-      const data = await getSession();
-      if (cancelled) return;
-
-      if (!data?.user) {
-        if (saved?.auth?.userId && saved.auth.isGuest) {
-          dispatch(rehydrateAuth(saved.auth));
-          dispatch(rehydrateProgress(saved.progress ?? { completedByDate: {}, streak: 0 }));
-          dispatch(
-            rehydrateSync({
-              pendingScores: (saved.sync?.pendingScores ?? []) as PendingScore[],
-              lastSyncAt: saved.sync?.lastSyncAt ?? null,
-            })
-          );
-          await store.dispatch(fetchUserProfile());
-          if (cancelled) return;
-          const user = store.getState().userProfile.user;
-          if (user) {
-            dispatch(rehydrateProgress(progressFromProfile(user)));
-          }
-          store.dispatch(flushPendingScores());
-        } else {
-          dispatch(signOutAction());
-        }
-        setSessionChecked(true);
-        return;
-      }
-
-      dispatch(setUser({ userId: data.user.id, email: data.user.email }));
-      await store.dispatch(fetchUserProfile());
-      if (cancelled) return;
-
-      const user = store.getState().userProfile.user;
-      if (user) {
-        dispatch(rehydrateProgress(progressFromProfile(user)));
-      } else {
-        dispatch(rehydrateProgress({ completedByDate: {}, streak: 0 }));
-      }
-      dispatch(rehydrateSync({ pendingScores: [], lastSyncAt: null }));
-
-      store.dispatch(flushPendingScores());
-      setSessionChecked(true);
-    })();
-
-    return () => { cancelled = true; };
-  }, [dispatch]);
-
-  useEffect(() => {
-    const onOnline = () => store.dispatch(flushPendingScores());
-    window.addEventListener('online', onOnline);
-    return () => window.removeEventListener('online', onOnline);
-  }, []);
+  const sessionChecked = useAppBootstrap();
 
   const handleSignOut = async () => {
     await apiSignOut();
