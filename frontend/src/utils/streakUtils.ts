@@ -13,15 +13,19 @@ function metaWithNormalizedKeys(meta: MetaWithSolved): MetaWithSolved {
 }
 
 /**
- * Consecutive solved days ending at today.
- * Logic: start at today; if today is solved, count 1 and go to yesterday; keep going back
- * until we hit a day that is not solved (or missing). Each solved day adds 1 to the streak.
- * Keys are normalized to YYYY-MM-DD so IDB/API keys (e.g. "2025-2-12") match getTodayIsoDate().
+ * Consecutive solved days for display.
+ * - If today is solved: count backwards from today (streak includes today).
+ * - If today is not solved: count backwards from yesterday (show continuity till previous day).
+ * So before attempting today the user sees their current streak (e.g. 2); after completing
+ * today it increments (e.g. 3). Keys are normalized to YYYY-MM-DD.
  */
 export function computeStreak(meta: MetaWithSolved): number {
   const normalized = metaWithNormalizedKeys(meta);
+  const today = getTodayIsoDate();
+  const endDate = normalized[today]?.solved ? today : previousIsoDate(today);
+
   let streak = 0;
-  let cursor = getTodayIsoDate();
+  let cursor = endDate;
 
   while (normalized[cursor]?.solved) {
     streak += 1;
