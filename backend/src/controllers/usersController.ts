@@ -4,12 +4,6 @@ import { prisma } from '../db.js';
 
 const JWT_SECRET = process.env.JWT_SECRET ?? 'dev-secret-change-in-production';
 
-/**
- * Option A (guest auth): Create user (guest if no email). For every new user we issue a JWT
- * and return it so the client can store it and send Authorization: Bearer <token> on later
- * requests (e.g. submit score). Guests get the same flow as Google users: one token per
- * identity, stored client-side and required for protected endpoints.
- */
 export async function createUser(req: Request, res: Response): Promise<void> {
   try {
     const { email } = req.body ?? {};
@@ -31,7 +25,7 @@ export async function getUserById(req: Request, res: Response): Promise<void> {
       where: { id },
       include: {
         stats: true,
-        dailyScores: { take: 30, orderBy: { date: 'desc' } },
+        dailyScores: { take: 365, orderBy: { date: 'desc' } },
       },
     });
     if (!user) {

@@ -8,6 +8,11 @@ export function getLocalIsoDate(date: Date): string {
   return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
 }
 
+/** Zero out time; returns same calendar day at 00:00:00 local. */
+export function startOfDay(d: Date): Date {
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+}
+
 /** Today's date as YYYY-MM-DD in local time. */
 export function getTodayIsoDate(): string {
   return getLocalIsoDate(new Date());

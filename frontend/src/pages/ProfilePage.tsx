@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import type { AppDispatch, RootState } from '../store';
 import { fetchUserProfile } from '../store/thunks/syncThunks';
-import { ThreeMonthHeatmap, type HeatmapActivity } from '../components/ThreeMonthHeatmap';
+import { YearHeatmap, type HeatmapActivity } from '../components/YearHeatmap';
 import type { PersistedUserProfile } from '../store/persistence';
 import type { PendingScore } from '../store/slices/syncSlice';
 
@@ -259,13 +259,13 @@ export const ProfilePage: React.FC = () => {
               </section>
             )}
 
-            {/* Heatmap */}
-            <section className="rounded-2xl border border-slate-800 bg-gradient-to-br from-slate-900 to-slate-950 p-5 sm:p-6">
+            {/* Heatmap — last 365 days */}
+            <section className="rounded-2xl border border-slate-800 bg-gradient-to-br from-slate-900 to-slate-950 p-5 sm:p-6 overflow-hidden">
               <h2 className="text-sm font-semibold uppercase tracking-wider text-slate-300 mb-4">
-                Activity Heatmap
+                Activity (365 days)
               </h2>
-              <div className="rounded-xl bg-slate-950/60 border border-slate-800 p-4">
-                <ThreeMonthHeatmap activity={heatmapActivity} />
+              <div className="rounded-xl bg-slate-950/60 border border-slate-800 p-4 min-w-0 max-w-full overflow-x-auto">
+                <YearHeatmap activity={heatmapActivity} />
               </div>
             </section>
 
