@@ -13,3 +13,10 @@ yarn-error.log*
 
 .env
 .env.*
+# Backend
+backend/.env
+backend/auth-config.json
+backend/node_modules/
+backend/dist/
+
+

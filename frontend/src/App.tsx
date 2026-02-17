@@ -1,123 +1,161 @@
 import React, { useEffect, useState } from 'react';
-import {
-  generateDailySequencePuzzle,
-  validateSequenceAnswer,
-  type SequencePuzzle,
-  type PuzzleValidationResult,
-} from './game/sequencePuzzle';
+import { BrowserRouter, Routes, Route, Link, useNavigate } from 'react-router-dom';
+import { useDispatch, useSelector } from 'react-redux';
+import type { AppDispatch, RootState } from './store';
+import { PlayPage } from './pages/PlayPage';
+import { ProfilePage } from './pages/ProfilePage';
+import { SignInPage } from './pages/SignInPage';
+import type { UserProfile } from './services/api';
+import { store, initStorePersistence } from './store';
+import { setUser, signOut as signOutAction, rehydrateAuth } from './store/slices/authSlice';
+import { rehydrateProgress } from './store/slices/progressSlice';
+import { rehydrateSync, type PendingScore } from './store/slices/syncSlice';
+import { fetchUserProfile, flushPendingScores } from './store/thunks/syncThunks';
+import { getSession, signOut as apiSignOut, setStoredToken } from './services/api';
+import { computeStreak } from './utils/streakUtils';
 
-// This component already represents a full \"vertical slice\":
-// - It generates today's puzzle purely on the client.
-// - It renders the puzzle UI.
-// - It validates the user's answer and shows feedback + score.
-const App: React.FC = () => {
-  const [puzzle, setPuzzle] = useState<SequencePuzzle | null>(null);
-  const [input, setInput] = useState('');
-  const [result, setResult] = useState<PuzzleValidationResult | null>(null);
+/** Build progress from API profile. Streak is derived from completedByDate (single source of truth). */
+function progressFromProfile(user: UserProfile): { completedByDate: Record<string, { solved: boolean; usedHint: boolean }>; streak: number } {
+  const completedByDate: Record<string, { solved: boolean; usedHint: boolean }> = {};
+  for (const s of user.dailyScores) {
+    if (!completedByDate[s.date]) completedByDate[s.date] = { solved: true, usedHint: false };
+  }
+  return { completedByDate, streak: computeStreak(completedByDate) };
+}
 
-  // Generate today's puzzle once when the component mounts.
+function AppContent(): React.ReactElement {
+  const dispatch = useDispatch<AppDispatch>();
+  const navigate = useNavigate();
+  const userId = useSelector((s: RootState) => s.auth.userId);
+  const [sessionChecked, setSessionChecked] = useState(false);
+
   useEffect(() => {
-    const today = new Date();
-    const dailyPuzzle = generateDailySequencePuzzle(today);
-    setPuzzle(dailyPuzzle);
+    let cancelled = false;
+
+    (async () => {
+      const saved = await initStorePersistence();
+      if (cancelled) return;
+
+      const hash = window.location.hash;
+      if (hash.startsWith('#token=')) {
+        setStoredToken(decodeURIComponent(hash.slice(7)));
+        window.history.replaceState({}, '', window.location.pathname + window.location.search);
+      }
+
+      const data = await getSession();
+      if (cancelled) return;
+
+      if (!data?.user) {
+        if (saved?.auth?.userId && saved.auth.isGuest) {
+          dispatch(rehydrateAuth(saved.auth));
+          dispatch(rehydrateProgress(saved.progress ?? { completedByDate: {}, streak: 0 }));
+          dispatch(
+            rehydrateSync({
+              pendingScores: (saved.sync?.pendingScores ?? []) as PendingScore[],
+              lastSyncAt: saved.sync?.lastSyncAt ?? null,
+            })
+          );
+          await store.dispatch(fetchUserProfile());
+          if (cancelled) return;
+          const user = store.getState().userProfile.user;
+          if (user) {
+            dispatch(rehydrateProgress(progressFromProfile(user)));
+          }
+          store.dispatch(flushPendingScores());
+        } else {
+          dispatch(signOutAction());
+        }
+        setSessionChecked(true);
+        return;
+      }
+
+      dispatch(setUser({ userId: data.user.id, email: data.user.email }));
+      await store.dispatch(fetchUserProfile());
+      if (cancelled) return;
+
+      const user = store.getState().userProfile.user;
+      if (user) {
+        dispatch(rehydrateProgress(progressFromProfile(user)));
+      } else {
+        dispatch(rehydrateProgress({ completedByDate: {}, streak: 0 }));
+      }
+      dispatch(rehydrateSync({ pendingScores: [], lastSyncAt: null }));
+
+      store.dispatch(flushPendingScores());
+      setSessionChecked(true);
+    })();
+
+    return () => { cancelled = true; };
+  }, [dispatch]);
+
+  useEffect(() => {
+    const onOnline = () => store.dispatch(flushPendingScores());
+    window.addEventListener('online', onOnline);
+    return () => window.removeEventListener('online', onOnline);
   }, []);
 
-  if (!puzzle) {
+  const handleSignOut = async () => {
+    await apiSignOut();
+    dispatch(signOutAction());
+    navigate('/');
+  };
+
+  if (!sessionChecked) {
     return (
-      <div className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center">
-        <p className="text-slate-300">Loading today&apos;s puzzle…</p>
+      <div className="min-h-screen bg-[#222222] text-[#F6F5F5] flex items-center justify-center">
+        <p className="text-[#D9E2FF]">Loading…</p>
       </div>
     );
   }
 
-  const visibleSequence = puzzle.sequence.map((value, index) =>
-    index === puzzle.missingIndex ? '?' : value,
-  );
-
-  const handleSubmit: React.FormEventHandler<HTMLFormElement> = (event) => {
-    event.preventDefault();
-    const numericGuess = Number(input);
-    if (Number.isNaN(numericGuess)) {
-      setResult({
-        isCorrect: false,
-        score: 0,
-      });
-      return;
-    }
-
-    const validation = validateSequenceAnswer(puzzle, numericGuess);
-    setResult(validation);
-  };
+  if (!userId) {
+    return <SignInPage />;
+  }
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col items-center justify-center px-4">
-      <div className="w-full max-w-xl space-y-6">
-        <header className="text-center space-y-2">
-          <h1 className="text-3xl font-semibold tracking-tight">
-            Logic Looper
-          </h1>
-          <p className="text-slate-300 text-sm">
-            Daily Sequence Solver &mdash; a small but complete slice of the
-            full game.
-          </p>
-        </header>
+    <div className="min-h-screen bg-[#222222] text-[#F6F5F5] flex flex-col items-center px-4 py-6">
+      <nav className="w-full max-w-xl flex items-center justify-between mb-6">
+        <Link
+          to="/"
+          className="text-lg font-semibold text-[#FFFFFF] hover:text-[#DDF2FD] transition-colors"
+        >
+          Logic Looper
+        </Link>
+        <div className="flex items-center gap-4">
+          <Link
+            to="/"
+            className="text-sm font-medium text-[#D9E2FF] hover:text-[#FFFFFF] transition-colors"
+          >
+            Play
+          </Link>
+          <Link
+            to="/profile"
+            className="text-sm font-medium text-[#D9E2FF] hover:text-[#FFFFFF] transition-colors"
+          >
+            Profile
+          </Link>
+          <button
+            type="button"
+            onClick={handleSignOut}
+            className="text-sm font-medium text-[#D9E2FF] hover:text-[#FFFFFF] transition-colors"
+          >
+            Sign out
+          </button>
+        </div>
+      </nav>
 
-        <section className="rounded-2xl border border-slate-800 bg-slate-900/60 p-6 space-y-4">
-          <h2 className="text-lg font-medium text-slate-100">
-            Today&apos;s Sequence
-          </h2>
-
-          <p className="text-slate-200 text-xl font-semibold tracking-wide">
-            {visibleSequence.join(', ')}
-          </p>
-
-          <p className="text-slate-400 text-sm">
-            The numbers follow a consistent pattern. Fill in the missing value
-            represented by <span className="font-semibold text-sky-400">?</span>
-            .
-          </p>
-
-          <form className="space-y-3" onSubmit={handleSubmit}>
-            <label className="block text-sm font-medium text-slate-200">
-              Your answer
-              <input
-                type="number"
-                value={input}
-                onChange={(event) => setInput(event.target.value)}
-                className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-500"
-                placeholder="Enter the missing number"
-              />
-            </label>
-            <button
-              type="submit"
-              className="inline-flex items-center justify-center rounded-lg bg-sky-500 px-4 py-2 text-sm font-semibold text-slate-950 hover:bg-sky-400 transition-colors"
-            >
-              Check answer
-            </button>
-          </form>
-
-          {result && (
-            <div
-              className={`mt-2 rounded-lg border px-3 py-2 text-sm ${
-                result.isCorrect
-                  ? 'border-emerald-500/70 bg-emerald-500/10 text-emerald-200'
-                  : 'border-rose-500/70 bg-rose-500/10 text-rose-200'
-              }`}
-            >
-              <p className="font-medium">
-                {result.isCorrect ? 'Correct!' : 'Not quite.'}
-              </p>
-              <p className="mt-1">
-                Score for this attempt:{' '}
-                <span className="font-semibold">{result.score}</span>
-              </p>
-            </div>
-          )}
-        </section>
-      </div>
+      <Routes>
+        <Route path="/" element={<PlayPage key={userId ?? undefined} />} />
+        <Route path="/profile" element={<ProfilePage />} />
+      </Routes>
     </div>
   );
-};
+}
+
+const App: React.FC = () => (
+  <BrowserRouter>
+    <AppContent />
+  </BrowserRouter>
+);
 
 export default App;
-

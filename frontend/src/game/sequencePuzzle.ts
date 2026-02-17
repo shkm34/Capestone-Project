@@ -9,16 +9,16 @@ export interface SequencePuzzle {
   answer: number; // correct value at missingIndex
 }
 
-export interface PuzzleValidationResult {
-  isCorrect: boolean;
-  score: number;
+function toLocalIso(date: Date): string {
+  const y = date.getFullYear();
+  const m = date.getMonth() + 1;
+  const d = date.getDate();
+  return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
 }
 
-// Very small deterministic pseudo-random generator from a date string.
-// In a later iteration we can swap this for Crypto-js based hashing,
-// but for now this keeps the concept simple and dependency-free.
-function seedFromDate(date: Date): number {
-  const iso = date.toISOString().slice(0, 10); // YYYY-MM-DD
+// Very small deterministic pseudo-random generator from a date string (YYYY-MM-DD).
+// Uses the same date string as the app's "today" (local date) so puzzle and progress stay in sync.
+function seedFromIsoDate(iso: string): number {
   let hash = 0;
   for (let i = 0; i < iso.length; i += 1) {
     hash = (hash * 31 + iso.charCodeAt(i)) >>> 0;
@@ -28,8 +28,10 @@ function seedFromDate(date: Date): number {
 
 // Generate a simple arithmetic progression puzzle like:
 // 2, 5, 8, ?, 14
-export function generateDailySequencePuzzle(date: Date): SequencePuzzle {
-  const seed = seedFromDate(date);
+// dateIso: YYYY-MM-DD in local time (same as getTodayIsoDate() so the puzzle matches "today").
+export function generateDailySequencePuzzle(dateOrIso: Date | string): SequencePuzzle {
+  const iso = typeof dateOrIso === 'string' ? dateOrIso : toLocalIso(dateOrIso);
+  const seed = seedFromIsoDate(iso);
 
   // Derive deterministic parameters from the seed.
   const base = 1 + (seed % 10); // 1..10
@@ -51,18 +53,29 @@ export function generateDailySequencePuzzle(date: Date): SequencePuzzle {
   };
 }
 
-// Validate a user's guess and compute a simple score.
-// For now:
-// - Correct: 10 points.
-// - Incorrect: 0 points.
+// Validate a user's guess.
+// Scoring is handled at the UI layer so that it can
+// also take hints, time taken, etc. into account.
 export function validateSequenceAnswer(
   puzzle: SequencePuzzle,
   guess: number,
-): PuzzleValidationResult {
-  const isCorrect = guess === puzzle.answer;
-  return {
-    isCorrect,
-    score: isCorrect ? 10 : 0,
-  };
+): boolean {
+  return guess === puzzle.answer;
+}
+
+/** Hint text for the sequence puzzle (for registry API). */
+export function getSequenceHint(puzzle: SequencePuzzle): string {
+  if (puzzle.sequence.length >= 2) {
+    const step = puzzle.sequence[1] - puzzle.sequence[0];
+    return `Look at how much the sequence increases each time. The common difference here is ${step}.`;
+  }
+  return 'Look for a consistent numerical pattern between terms.';
+}
+
+/** Display string for UI: sequence with ? at missing index. */
+export function getSequenceDisplay(puzzle: SequencePuzzle): string {
+  return puzzle.sequence
+    .map((value, index) => (index === puzzle.missingIndex ? '?' : String(value)))
+    .join(', ');
 }
 
