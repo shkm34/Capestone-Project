@@ -1,9 +1,11 @@
 import { createGuest, submitScore as apiSubmitScore, fetchUser, isOnline } from '../../services/api';
 import type { AppDispatch, RootState } from '../index';
 import { setGuest } from '../slices/authSlice';
-import { setUserProfile, setProfileFetchError } from '../slices/userProfileSlice';
+import { setUserProfile, setProfileFetchError, rehydrateUserProfile } from '../slices/userProfileSlice';
 import { enqueueScore, clearPendingScores } from '../slices/syncSlice';
+import { loadFromIndexedDB } from '../persistence';
 import type { PendingScore } from '../slices/syncSlice';
+import { buildSyntheticGuestProfile } from './buildSyntheticGuestProfile';
 
 type AppThunk = (dispatch: AppDispatch, getState: () => RootState) => Promise<void>;
 
@@ -105,14 +107,33 @@ export function flushPendingScores(): AppThunk {
 export function fetchUserProfile(): AppThunk {
   return async (dispatch, getState) => {
     const uid = getState().auth.userId;
-    if (!uid || !isOnline()) return;
+    if (!uid) return;
+
+    // Local guest: backend has no profile. Use cached from IndexedDB, or build synthetic from Redux.
+    if (uid.startsWith('guest-')) {
+      const saved = await loadFromIndexedDB();
+      if (saved?.userProfile?.user) {
+        dispatch(rehydrateUserProfile({ user: saved.userProfile.user, lastFetchedAt: saved.userProfile.lastFetchedAt ?? null }));
+        return;
+      }
+      const state = getState();
+      dispatch(setUserProfile(buildSyntheticGuestProfile(uid, state.progress, state.sync)));
+      return;
+    }
+
+    if (!isOnline()) return;
     try {
       const user = await fetchUser(uid);
       dispatch(setUserProfile(user));
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Fetch failed';
-      dispatch(setProfileFetchError(msg));
       console.warn('[sync] fetchUserProfile failed', e);
+      const saved = await loadFromIndexedDB();
+      if (saved?.userProfile?.user) {
+        dispatch(rehydrateUserProfile({ user: saved.userProfile.user, lastFetchedAt: saved.userProfile.lastFetchedAt ?? null }));
+      } else {
+        dispatch(setProfileFetchError(msg));
+      }
     }
   };
 }

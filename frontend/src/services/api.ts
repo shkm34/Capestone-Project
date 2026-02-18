@@ -52,14 +52,20 @@ export function getSignInWithGoogleUrl(): string {
   return `${getBaseUrl()}/api/auth/signin/google`;
 }
 
-/** POST /api/auth/signout - client clears token. */
+/** POST /api/auth/signout - clear server session. Always clears local token (offline-safe). */
 export async function signOut(): Promise<void> {
-  await fetch(`${getBaseUrl()}/api/auth/signout`, {
-    method: 'POST',
-    headers: authHeaders(),
-    credentials: 'include',
-  });
-  clearStoredToken();
+  try {
+    await fetch(`${getBaseUrl()}/api/auth/signout`, {
+      method: 'POST',
+      headers: authHeaders(),
+      credentials: 'include',
+    });
+  } catch (e) {
+    // Backend down or network error: still sign out locally
+    console.warn('[api] signOut request failed, clearing local token', e);
+  } finally {
+    clearStoredToken();
+  }
 }
 
 export interface CreateUserResponse {

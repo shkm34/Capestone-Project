@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useDispatch } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import type { AppDispatch } from '../store';
-import { createGuest } from '../services/api';
+import { createGuest} from '../services/api';
 import { setGuest } from '../store/slices/authSlice';
 
 interface UseGuestSignInResult {
@@ -31,7 +31,10 @@ export function useGuestSignIn(): UseGuestSignInResult {
       dispatch(setGuest({ userId: user.id }));
       navigate('/');
     } catch {
-      setGuestError('Could not start guest session. Please try again.');
+      // Backend down or network error: fall back to local guest so the app still works (offline-first).
+      const localId = `guest-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      dispatch(setGuest({ userId: localId }));
+      navigate('/');
     } finally {
       setGuestLoading(false);
     }

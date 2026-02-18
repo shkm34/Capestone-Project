@@ -34,6 +34,14 @@ export async function submitScore(req: AuthenticatedRequest, res: Response): Pro
     }
 
     const scoreNum = Number(score);
+    const allowedScores = new Set([0, 6, 10]);
+    if (!Number.isFinite(scoreNum) || !allowedScores.has(scoreNum)) {
+      res.status(400).json({
+        error: 'Invalid score: must be one of 0, 6, or 10',
+      });
+      return;
+    }
+
     const timeMs = timeTakenMs != null ? Number(timeTakenMs) : null;
     const streakCount = typeof streak === 'number' && streak >= 0 ? streak : user.streakCount;
 

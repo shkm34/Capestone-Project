@@ -6,6 +6,7 @@ import type { UserProfile } from '../services/api';
 import { setUser, signOut as signOutAction, rehydrateAuth } from '../store/slices/authSlice';
 import { rehydrateProgress } from '../store/slices/progressSlice';
 import { rehydrateSync, type PendingScore } from '../store/slices/syncSlice';
+import { rehydrateUserProfile } from '../store/slices/userProfileSlice';
 import { fetchUserProfile, flushPendingScores } from '../store/thunks/syncThunks';
 import { getSession, setStoredToken } from '../services/api';
 import { computeStreak } from '../utils/streakUtils';
@@ -51,7 +52,15 @@ export function useAppBootstrap(): boolean {
         window.history.replaceState({}, '', window.location.pathname + window.location.search);
       }
 
-      const data = await getSession();
+      let data: { user: { id: string; email: string | null } } | null = null;
+      try {
+        data = await getSession();
+      } catch (e) {
+        // Backend unreachable or other network error – treat as "no server session"
+        // so the app can still boot from local persistence (offline-first behavior).
+        console.warn('[bootstrap] getSession failed, falling back to saved state', e);
+        data = null;
+      }
       if (cancelled) return;
 
       // No authenticated user from the server: try to restore guest from persistence.
@@ -65,6 +74,9 @@ export function useAppBootstrap(): boolean {
               lastSyncAt: saved.sync?.lastSyncAt ?? null,
             }),
           );
+          if (saved?.userProfile?.user != null) {
+            dispatch(rehydrateUserProfile({ user: saved.userProfile.user, lastFetchedAt: saved.userProfile.lastFetchedAt ?? null }));
+          }
 
           await store.dispatch(fetchUserProfile());
           if (cancelled) return;

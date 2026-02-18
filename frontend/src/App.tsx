@@ -17,7 +17,11 @@ function AppContent(): React.ReactElement {
   const sessionChecked = useAppBootstrap();
 
   const handleSignOut = async () => {
-    await apiSignOut();
+    try {
+      await apiSignOut();
+    } catch {
+      // Offline or backend down: still sign out locally
+    }
     dispatch(signOutAction());
     navigate('/');
   };
