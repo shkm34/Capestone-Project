@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { getTodayIsoDate } from '../utils/dateUtils';
+import { getTodayIsoUTC } from '../utils/dateUtils';
 import { getPuzzleTypeForDate } from '../utils/puzzleCycle';
 import { getPuzzleModule, type DailyPuzzle } from '../game/puzzleRegistry';
 import { markDaySolved, markHintUsed } from '../store/slices/progressSlice';
@@ -11,7 +11,7 @@ import type { AppDispatch, RootState } from '../store';
 export const useDailyGame = () => {
   const dispatch = useDispatch<AppDispatch>();
   const progress = useSelector((state: RootState) => state.progress);
-  const todayIso = getTodayIsoDate();
+  const todayIso = getTodayIsoUTC();
   const puzzleType = getPuzzleTypeForDate(todayIso);
   const todayMeta = progress.completedByDate[todayIso];
   const module = getPuzzleModule(puzzleType);

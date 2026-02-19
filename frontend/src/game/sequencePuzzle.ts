@@ -17,7 +17,7 @@ function toLocalIso(date: Date): string {
 }
 
 // Very small deterministic pseudo-random generator from a date string (YYYY-MM-DD).
-// Uses the same date string as the app's "today" (local date) so puzzle and progress stay in sync.
+// Uses the same date string as the app's "today" (UTC) so puzzle and progress stay in sync with the backend.
 function seedFromIsoDate(iso: string): number {
   let hash = 0;
   for (let i = 0; i < iso.length; i += 1) {
@@ -28,7 +28,7 @@ function seedFromIsoDate(iso: string): number {
 
 // Generate a simple arithmetic progression puzzle like:
 // 2, 5, 8, ?, 14
-// dateIso: YYYY-MM-DD in local time (same as getTodayIsoDate() so the puzzle matches "today").
+// dateIso: YYYY-MM-DD in UTC (same as getTodayIsoUTC() so the puzzle matches "today" and backend accepts scores).
 export function generateDailySequencePuzzle(dateOrIso: Date | string): SequencePuzzle {
   const iso = typeof dateOrIso === 'string' ? dateOrIso : toLocalIso(dateOrIso);
   const seed = seedFromIsoDate(iso);

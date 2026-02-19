@@ -1,9 +1,9 @@
-import { getTodayIsoDate, normalizeDateKey, previousIsoDate } from './dateUtils';
+import { getTodayIsoUTC, normalizeDateKey, previousIsoDate } from './dateUtils';
 
 /** Meta shape needed for streak: at least { solved?: boolean } per date. */
 export type MetaWithSolved = Record<string, { solved?: boolean }>;
 
-/** Build a map with normalized YYYY-MM-DD keys so lookups match getTodayIsoDate(). */
+/** Build a map with normalized YYYY-MM-DD keys so lookups match getTodayIsoUTC(). */
 function metaWithNormalizedKeys(meta: MetaWithSolved): MetaWithSolved {
   const out: MetaWithSolved = {};
   for (const [key, value] of Object.entries(meta)) {
@@ -21,7 +21,7 @@ function metaWithNormalizedKeys(meta: MetaWithSolved): MetaWithSolved {
  */
 export function computeStreak(meta: MetaWithSolved): number {
   const normalized = metaWithNormalizedKeys(meta);
-  const today = getTodayIsoDate();
+  const today = getTodayIsoUTC();
   const endDate = normalized[today]?.solved ? today : previousIsoDate(today);
 
   let streak = 0;

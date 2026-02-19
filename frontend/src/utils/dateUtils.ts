@@ -13,9 +13,14 @@ export function startOfDay(d: Date): Date {
   return new Date(d.getFullYear(), d.getMonth(), d.getDate());
 }
 
-/** Today's date as YYYY-MM-DD in local time. */
+/** Today's date as YYYY-MM-DD in local time. Use for display only. */
 export function getTodayIsoDate(): string {
   return getLocalIsoDate(new Date());
+}
+
+/** Today's date as YYYY-MM-DD in UTC. Use for game day (progress, puzzle, score) so backend accepts submissions. */
+export function getTodayIsoUTC(): string {
+  return new Date().toISOString().slice(0, 10);
 }
 
 /** Previous calendar day from a YYYY-MM-DD string (local date). */
@@ -28,7 +33,7 @@ export function previousIsoDate(dateIso: string): string {
 
 /**
  * Normalize a date string to YYYY-MM-DD (padded month/day).
- * Use when reading completedByDate from IDB or API so keys always match getTodayIsoDate().
+ * Use when reading completedByDate from IDB or API so keys always match getTodayIsoUTC().
  */
 export function normalizeDateKey(key: string): string {
   const parts = key.trim().split('-').map((p) => parseInt(p, 10));

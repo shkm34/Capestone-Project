@@ -10,7 +10,7 @@ import {
   validateSequenceAnswer,
   type SequencePuzzle,
 } from '../game/sequencePuzzle';
-import { getTodayIsoDate } from '../utils/dateUtils';
+import { getTodayIsoUTC } from '../utils/dateUtils';
 import { markDaySolved, markHintUsed } from '../store/slices/progressSlice';
 import { submitOrEnqueueScore } from '../store/thunks/syncThunks';
 import type { AppDispatch, RootState } from '../store';
@@ -18,7 +18,7 @@ import type { AppDispatch, RootState } from '../store';
 export const useDailySequenceGame = () => {
   const dispatch = useDispatch<AppDispatch>();
   const progress = useSelector((state: RootState) => state.progress);
-  const todayIso = getTodayIsoDate();
+  const todayIso = getTodayIsoUTC();
   const todayMeta = progress.completedByDate[todayIso];
 
   const [puzzle, setPuzzle] = useState<SequencePuzzle | null>(null);

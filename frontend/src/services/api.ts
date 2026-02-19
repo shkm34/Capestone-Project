@@ -86,6 +86,17 @@ export interface SubmitScoreBody {
   streak: number;
 }
 
+/** Thrown on non-2xx so callers can distinguish 4xx (client error) from 5xx/network. */
+export class ApiError extends Error {
+  constructor(
+    public readonly status: number,
+    message: string,
+  ) {
+    super(message);
+    this.name = 'ApiError';
+  }
+}
+
 export async function submitScore(body: SubmitScoreBody): Promise<{ accepted: boolean; streak: number }> {
   const res = await fetch(`${getBaseUrl()}/api/score`, {
     method: 'POST',
@@ -93,7 +104,16 @@ export async function submitScore(body: SubmitScoreBody): Promise<{ accepted: bo
     body: JSON.stringify(body),
     credentials: 'include',
   });
-  if (!res.ok) throw new Error(`submitScore failed: ${res.status}`);
+  if (!res.ok) {
+    let message = `Request failed: ${res.status}`;
+    try {
+      const body = (await res.json()) as { error?: string };
+      if (body?.error && typeof body.error === 'string') message = body.error;
+    } catch {
+      // ignore
+    }
+    throw new ApiError(res.status, message);
+  }
   return res.json() as Promise<{ accepted: boolean; streak: number }>;
 }
 

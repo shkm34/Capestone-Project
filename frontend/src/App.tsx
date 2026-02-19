@@ -8,6 +8,7 @@ import { LeaderboardPage } from './pages/LeaderboardPage';
 import { SignInPage } from './pages/SignInPage';
 import { signOut as apiSignOut } from './services/api';
 import { signOut as signOutAction } from './store/slices/authSlice';
+import { clearLeaderboard } from './store/slices/leaderboardSlice';
 import { useAppBootstrap } from './hooks/useAppBootstrap';
 import { MainHeader } from './components/MainHeader';
 import { ToastContainer } from './components/ToastContainer';
@@ -24,6 +25,7 @@ function AppContent(): React.ReactElement {
     } catch {
       // Offline or backend down: still sign out locally
     }
+    dispatch(clearLeaderboard());
     dispatch(signOutAction());
     navigate('/');
   };

@@ -1,14 +1,15 @@
 import { useEffect, useState } from 'react';
 import { useDispatch } from 'react-redux';
 import { store, initStorePersistence } from '../store';
+import { setRehydrationDone } from '../store/persistence';
 import type { AppDispatch } from '../store';
 import type { UserProfile } from '../services/api';
 import { setUser, signOut as signOutAction, rehydrateAuth } from '../store/slices/authSlice';
 import { rehydrateProgress } from '../store/slices/progressSlice';
 import { rehydrateSync, type PendingScore } from '../store/slices/syncSlice';
 import { rehydrateUserProfile } from '../store/slices/userProfileSlice';
-import { rehydrateLeaderboard } from '../store/slices/leaderboardSlice';
-import { fetchUserProfile, flushPendingScores } from '../store/thunks/syncThunks';
+import { rehydrateLeaderboard, clearLeaderboard } from '../store/slices/leaderboardSlice';
+import { fetchUserProfile, flushPendingScores, ensureUserId } from '../store/thunks/syncThunks';
 import { getSession, setStoredToken } from '../services/api';
 import { computeStreak } from '../utils/streakUtils';
 
@@ -24,6 +25,16 @@ function progressFromProfile(user: UserProfile): {
     }
   }
   return { completedByDate, streak: computeStreak(completedByDate) };
+}
+
+/** Merge server progress with saved (IDB) progress so local-only dates and pending scores are not lost. */
+function mergeProgress(
+  server: { completedByDate: Record<string, { solved: boolean; usedHint: boolean }>; streak: number },
+  saved: { completedByDate?: Record<string, { solved: boolean; usedHint: boolean }>; streak?: number } | null | undefined,
+): { completedByDate: Record<string, { solved: boolean; usedHint: boolean }>; streak: number } {
+  const fromSaved = saved?.completedByDate ?? {};
+  const merged = { ...fromSaved, ...server.completedByDate };
+  return { completedByDate: merged, streak: computeStreak(merged) };
 }
 
 /**
@@ -78,18 +89,32 @@ export function useAppBootstrap(): boolean {
 
       // No authenticated user from the server: try to restore guest from persistence.
       if (!data?.user) {
-        if (saved?.auth?.userId && saved.auth.isGuest) {
-          dispatch(rehydrateAuth(saved.auth));
-          dispatch(rehydrateProgress(saved.progress ?? { completedByDate: {}, streak: 0 }));
+        const hasSavedGuest =
+          (saved?.auth != null && saved.auth.userId != null && saved.auth.isGuest) ||
+          (saved != null &&
+            ((saved.sync?.pendingScores?.length ?? 0) > 0 ||
+              Object.keys(saved.progress?.completedByDate ?? {}).length > 0));
+
+        if (hasSavedGuest) {
+          if (saved?.auth?.userId != null && saved.auth.isGuest) {
+            dispatch(rehydrateAuth(saved.auth));
+          }
+          dispatch(rehydrateProgress(saved?.progress ?? { completedByDate: {}, streak: 0 }));
           dispatch(
             rehydrateSync({
-              pendingScores: (saved.sync?.pendingScores ?? []) as PendingScore[],
-              lastSyncAt: saved.sync?.lastSyncAt ?? null,
+              pendingScores: (saved?.sync?.pendingScores ?? []) as PendingScore[],
+              lastSyncAt: saved?.sync?.lastSyncAt ?? null,
             }),
           );
           if (saved?.userProfile?.user != null) {
             dispatch(rehydrateUserProfile({ user: saved.userProfile.user, lastFetchedAt: saved.userProfile.lastFetchedAt ?? null }));
           }
+
+          // If we had no persisted auth (e.g. old IDB), ensure we have a guest userId before building profile.
+          if (!store.getState().auth.userId) {
+            await store.dispatch(ensureUserId());
+          }
+          if (cancelled) return;
 
           await store.dispatch(fetchUserProfile());
           if (cancelled) return;
@@ -100,28 +125,49 @@ export function useAppBootstrap(): boolean {
           }
 
           store.dispatch(flushPendingScores());
+
+          // Rehydrated leaderboard may be from a previous user; clear if currentUser doesn't match.
+          const guestState = store.getState();
+          if (guestState.leaderboard.data?.currentUser?.id !== guestState.auth.userId) {
+            dispatch(clearLeaderboard());
+          }
         } else {
+          dispatch(clearLeaderboard());
           dispatch(signOutAction());
         }
 
+        setRehydrationDone();
         setSessionChecked(true);
         return;
       }
 
-      // Authenticated user from server: hydrate auth, profile, progress, and sync.
+      // Authenticated user from server: rehydrate from IDB first, then fetch profile and merge so local progress/pending are not lost.
       dispatch(setUser({ userId: data.user.id, email: data.user.email }));
+      dispatch(rehydrateProgress(saved?.progress ?? { completedByDate: {}, streak: 0 }));
+      dispatch(
+        rehydrateSync({
+          pendingScores: (saved?.sync?.pendingScores ?? []) as PendingScore[],
+          lastSyncAt: saved?.sync?.lastSyncAt ?? null,
+        }),
+      );
+
       await store.dispatch(fetchUserProfile());
       if (cancelled) return;
 
       const user = store.getState().userProfile.user;
-      if (user) {
-        dispatch(rehydrateProgress(progressFromProfile(user)));
-      } else {
-        dispatch(rehydrateProgress({ completedByDate: {}, streak: 0 }));
+      const serverProgress = user ? progressFromProfile(user) : { completedByDate: {}, streak: 0 };
+      const merged = mergeProgress(serverProgress, saved?.progress);
+      dispatch(rehydrateProgress(merged));
+
+      store.dispatch(flushPendingScores());
+
+      // Rehydrated leaderboard may be from a different user; clear if currentUser doesn't match.
+      const authState = store.getState();
+      if (authState.leaderboard.data?.currentUser?.id !== authState.auth.userId) {
+        dispatch(clearLeaderboard());
       }
 
-      dispatch(rehydrateSync({ pendingScores: [], lastSyncAt: null }));
-      store.dispatch(flushPendingScores());
+      setRehydrationDone();
       setSessionChecked(true);
     })();
 

@@ -70,10 +70,14 @@ export async function saveToIndexedDB(state: PersistedState): Promise<void> {
   const db = await openDB();
   const tx = db.transaction(STORE_NAME, "readwrite");
   const store = tx.objectStore(STORE_NAME);
-  store.put(
-    { auth: state.auth, progress: state.progress, sync: state.sync, userProfile: state.userProfile },
-    KEY,
-  );
+  const toPut = {
+    auth: state.auth,
+    progress: state.progress,
+    sync: state.sync,
+    userProfile: state.userProfile,
+    leaderboard: state.leaderboard ?? { data: null, lastFetchedAt: null },
+  };
+  store.put(toPut, KEY);
   await new Promise<void>((resolve, reject) => {
     tx.oncomplete = () => resolve();
     tx.onerror = () => reject(tx.error);
@@ -83,6 +87,13 @@ export async function saveToIndexedDB(state: PersistedState): Promise<void> {
 
 const SAVE_DELAY_MS = 300;
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
+
+/** Set to true after bootstrap has rehydrated (or signed out). Prevents saving initial empty state over good IDB data. */
+let rehydrationDone = false;
+
+export function setRehydrationDone(): void {
+  rehydrationDone = true;
+}
 
 export type GetState = () => {
   auth: PersistedState["auth"];
@@ -107,6 +118,7 @@ export async function initPersistence(store: {
   const saved = await loadFromIndexedDB();
 
   store.subscribe(() => {
+    if (!rehydrationDone) return;
     if (saveTimer) clearTimeout(saveTimer);
     saveTimer = setTimeout(() => {
       saveTimer = null;

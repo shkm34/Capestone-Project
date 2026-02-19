@@ -38,9 +38,19 @@ export function useProfileData() {
   const loading = Boolean(userId && !user && !fetchError);
   const error = Boolean(fetchError);
 
+  // When server has no scores but we have local progress/pending, show merged profile so stats aren't 0.
+  const hasLocalActivity =
+    user != null &&
+    user.dailyScores.length === 0 &&
+    (Object.keys(progress.completedByDate).length > 0 || sync.pendingScores.length > 0);
+  const displayUser =
+    hasLocalActivity
+      ? { ...buildSyntheticGuestProfile(user.id, progress, sync), email: user.email }
+      : user;
+
   return {
     userId,
-    user,
+    user: displayUser,
     lastFetchedAt,
     fetchError,
     loading,

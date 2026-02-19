@@ -1,4 +1,4 @@
-import { createGuest, submitScore as apiSubmitScore, fetchUser, isOnline, fetchLeaderboard } from '../../services/api';
+import { createGuest, submitScore as apiSubmitScore, fetchUser, isOnline, fetchLeaderboard, ApiError, type LeaderboardResponse } from '../../services/api';
 import type { AppDispatch, RootState } from '../index';
 import { setGuest } from '../slices/authSlice';
 import { setUserProfile, setProfileFetchError, rehydrateUserProfile } from '../slices/userProfileSlice';
@@ -57,8 +57,8 @@ export function submitOrEnqueueScore(payload: SubmitOrEnqueuePayload): AppThunk 
 
     try {
       await dispatch(ensureUserId());
-      const nextState = getState();
-      const uid = nextState.auth.userId;
+      let nextState = getState();
+      let uid = nextState.auth.userId;
       if (!uid) {
         dispatch(enqueueScore(body));
         dispatch(
@@ -68,6 +68,25 @@ export function submitOrEnqueueScore(payload: SubmitOrEnqueuePayload): AppThunk 
           }),
         );
         return;
+      }
+      // Local guest: backend has no user. Create a server guest so score is accepted (avoids 400).
+      if (uid.startsWith('guest-')) {
+        try {
+          const user = await createGuest();
+          dispatch(setGuest({ userId: user.id }));
+          nextState = getState();
+          uid = nextState.auth.userId!;
+        } catch (e) {
+          console.warn('[sync] createGuest for submit failed', e);
+          dispatch(enqueueScore(body));
+          dispatch(
+            addToast({
+              message: 'Server unreachable – score queued for later.',
+              kind: 'warning',
+            }),
+          );
+          return;
+        }
       }
       await apiSubmitScore({
         date: payload.date,
@@ -82,14 +101,25 @@ export function submitOrEnqueueScore(payload: SubmitOrEnqueuePayload): AppThunk 
           kind: 'success',
         }),
       );
+      await dispatch(fetchUserProfile());
     } catch (e) {
-      dispatch(enqueueScore(body));
-      dispatch(
-        addToast({
-          message: 'Server unreachable – score queued for later.',
-          kind: 'warning',
-        }),
-      );
+      const isClientError = e instanceof ApiError && e.status >= 400 && e.status < 500;
+      if (isClientError) {
+        dispatch(
+          addToast({
+            message: e.message || 'Score could not be saved.',
+            kind: 'error',
+          }),
+        );
+      } else {
+        dispatch(enqueueScore(body));
+        dispatch(
+          addToast({
+            message: 'Server unreachable – score queued for later.',
+            kind: 'warning',
+          }),
+        );
+      }
     }
   };
 }
@@ -122,6 +152,7 @@ export function flushPendingScores(): AppThunk {
 
       const pending = [...state.sync.pendingScores];
       const failed: PendingScore[] = [];
+      let dropped = 0;
       for (const p of pending) {
         try {
           await apiSubmitScore({
@@ -132,16 +163,28 @@ export function flushPendingScores(): AppThunk {
             streak: p.streak,
           });
         } catch (e) {
-          console.warn('[sync] flush item failed', e);
-          failed.push(p);
+          const isPermanentReject = e instanceof ApiError && e.status === 400;
+          if (isPermanentReject) {
+            dropped += 1;
+          } else {
+            failed.push(p);
+          }
+          if (!isPermanentReject) console.warn('[sync] flush item failed', e);
         }
       }
       dispatch(setPendingScores(failed));
-      if (failed.length === 0) {
+      if (failed.length === 0 && dropped === 0) {
         dispatch(
           addToast({
             message: 'All pending scores synced to server.',
             kind: 'success',
+          }),
+        );
+      } else if (failed.length === 0 && dropped > 0) {
+        dispatch(
+          addToast({
+            message: dropped === 1 ? 'One score could not be synced (invalid date).' : `${dropped} scores could not be synced (invalid date).`,
+            kind: 'warning',
           }),
         );
       } else if (failed.length < pending.length) {
@@ -151,10 +194,10 @@ export function flushPendingScores(): AppThunk {
             kind: 'warning',
           }),
         );
-      } else {
+      } else if (failed.length > 0) {
         dispatch(
           addToast({
-            message: 'Still offline – scores will sync when possible.',
+            message: 'Scores will sync when the server is available.',
             kind: 'info',
           }),
         );
@@ -205,6 +248,26 @@ export function loadLeaderboard(): AppThunk {
     dispatch(setLeaderboardLoading(!cached));
     dispatch(setLeaderboardError(null));
 
+    // Offline: use Redux cache or try IndexedDB; don't hit the network.
+    if (!isOnline()) {
+      if (cached) {
+        dispatch(setLeaderboardLoading(false));
+        return;
+      }
+      const saved = await loadFromIndexedDB();
+      const idbLeaderboard = saved?.leaderboard?.data;
+      if (idbLeaderboard && typeof idbLeaderboard === 'object' && idbLeaderboard !== null && 'top' in idbLeaderboard) {
+        dispatch(setLeaderboard({
+          data: idbLeaderboard as LeaderboardResponse,
+          fetchedAt: saved?.leaderboard?.lastFetchedAt ?? new Date().toISOString(),
+        }));
+      } else {
+        dispatch(setLeaderboardError('Leaderboard is available when you\'re online.'));
+      }
+      dispatch(setLeaderboardLoading(false));
+      return;
+    }
+
     try {
       const res = await fetchLeaderboard({
         sortBy: 'totalScore',
@@ -213,8 +276,19 @@ export function loadLeaderboard(): AppThunk {
       });
       dispatch(setLeaderboard({ data: res, fetchedAt: new Date().toISOString() }));
     } catch (e) {
-      if (!cached) {
-        dispatch(setLeaderboardError('Unable to load leaderboard right now.'));
+      if (cached) {
+        // Keep showing cached data; no error.
+      } else {
+        const saved = await loadFromIndexedDB();
+        const idbLeaderboard = saved?.leaderboard?.data;
+        if (idbLeaderboard && typeof idbLeaderboard === 'object' && idbLeaderboard !== null && 'top' in idbLeaderboard) {
+          dispatch(setLeaderboard({
+            data: idbLeaderboard as LeaderboardResponse,
+            fetchedAt: saved?.leaderboard?.lastFetchedAt ?? new Date().toISOString(),
+          }));
+        } else {
+          dispatch(setLeaderboardError('Unable to load leaderboard right now.'));
+        }
       }
     } finally {
       dispatch(setLeaderboardLoading(false));
