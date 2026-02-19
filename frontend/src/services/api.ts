@@ -2,7 +2,9 @@
  * API client for Logic Looper backend. Auth uses Authorization: Bearer <token> only.
  */
 
-const TOKEN_KEY = 'logic_looper_token';
+import { getStoredToken, setStoredToken, clearStoredToken } from './authStorage';
+
+export { getStoredToken, setStoredToken, clearStoredToken };
 
 export const getBaseUrl = (): string => {
   const env = typeof import.meta !== 'undefined' ? import.meta.env : undefined;
@@ -10,19 +12,6 @@ export const getBaseUrl = (): string => {
   if (url && typeof url === 'string') return url;
   return 'http://localhost:3000';
 };
-
-export function getStoredToken(): string | null {
-  if (typeof localStorage === 'undefined') return null;
-  return localStorage.getItem(TOKEN_KEY);
-}
-
-export function setStoredToken(token: string): void {
-  localStorage.setItem(TOKEN_KEY, token);
-}
-
-export function clearStoredToken(): void {
-  localStorage.removeItem(TOKEN_KEY);
-}
 
 function authHeaders(): HeadersInit {
   const token = getStoredToken();

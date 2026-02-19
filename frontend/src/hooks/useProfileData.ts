@@ -1,9 +1,10 @@
 import { useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import type { AppDispatch, RootState } from '../store';
-import { fetchUserProfile } from '../store/thunks/syncThunks';
+import { fetchUserProfile, flushPendingScores } from '../store/thunks/syncThunks';
 import { setUserProfile } from '../store/slices/userProfileSlice';
 import { buildSyntheticGuestProfile } from '../store/thunks/buildSyntheticGuestProfile';
+import { isOnline } from '../services/api';
 
 export function useProfileData() {
   const dispatch = useDispatch<AppDispatch>();
@@ -18,6 +19,13 @@ export function useProfileData() {
   useEffect(() => {
     if (userId) {
       dispatch(fetchUserProfile());
+    }
+  }, [dispatch, userId]);
+
+  // When Profile is visited and we're online, try to flush pending scores (covers "server came back" without refresh).
+  useEffect(() => {
+    if (userId && isOnline()) {
+      dispatch(flushPendingScores());
     }
   }, [dispatch, userId]);
 

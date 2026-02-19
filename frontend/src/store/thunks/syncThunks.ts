@@ -2,7 +2,7 @@ import { createGuest, submitScore as apiSubmitScore, fetchUser, isOnline } from 
 import type { AppDispatch, RootState } from '../index';
 import { setGuest } from '../slices/authSlice';
 import { setUserProfile, setProfileFetchError, rehydrateUserProfile } from '../slices/userProfileSlice';
-import { enqueueScore, clearPendingScores } from '../slices/syncSlice';
+import { enqueueScore, setPendingScores } from '../slices/syncSlice';
 import { loadFromIndexedDB } from '../persistence';
 import type { PendingScore } from '../slices/syncSlice';
 import { buildSyntheticGuestProfile } from './buildSyntheticGuestProfile';
@@ -69,20 +69,34 @@ export function submitOrEnqueueScore(payload: SubmitOrEnqueuePayload): AppThunk 
   };
 }
 
-/** Send all pending scores to the API when online. */
+/** Send all pending scores to the API when online. Keeps failed items in the queue for retry. */
 export function flushPendingScores(): AppThunk {
   return async (dispatch, getState) => {
     if (!isOnline()) return;
-    const { sync } = getState();
-    if (sync.pendingScores.length === 0) return;
+    let state = getState();
+    if (state.sync.pendingScores.length === 0) return;
 
     try {
       await dispatch(ensureUserId());
-      const nextState = getState();
-      const uid = nextState.auth.userId;
+      state = getState();
+      let uid = state.auth.userId;
       if (!uid) return;
 
-      const pending = [...nextState.sync.pendingScores];
+      // Local guest: backend has no user. Create a server guest so scores can be submitted.
+      if (uid.startsWith('guest-')) {
+        try {
+          const user = await createGuest();
+          dispatch(setGuest({ userId: user.id }));
+          state = getState();
+          uid = state.auth.userId!;
+        } catch (e) {
+          console.warn('[sync] createGuest for flush failed', e);
+          return;
+        }
+      }
+
+      const pending = [...state.sync.pendingScores];
+      const failed: PendingScore[] = [];
       for (const p of pending) {
         try {
           await apiSubmitScore({
@@ -94,9 +108,10 @@ export function flushPendingScores(): AppThunk {
           });
         } catch (e) {
           console.warn('[sync] flush item failed', e);
+          failed.push(p);
         }
       }
-      dispatch(clearPendingScores());
+      dispatch(setPendingScores(failed));
     } catch (e) {
       console.warn('[sync] flushPendingScores failed', e);
     }
@@ -109,13 +124,8 @@ export function fetchUserProfile(): AppThunk {
     const uid = getState().auth.userId;
     if (!uid) return;
 
-    // Local guest: backend has no profile. Use cached from IndexedDB, or build synthetic from Redux.
+    // Local guest: backend has no profile. Always build synthetic from current state (avoids stale IDB overwriting).
     if (uid.startsWith('guest-')) {
-      const saved = await loadFromIndexedDB();
-      if (saved?.userProfile?.user) {
-        dispatch(rehydrateUserProfile({ user: saved.userProfile.user, lastFetchedAt: saved.userProfile.lastFetchedAt ?? null }));
-        return;
-      }
       const state = getState();
       dispatch(setUserProfile(buildSyntheticGuestProfile(uid, state.progress, state.sync)));
       return;

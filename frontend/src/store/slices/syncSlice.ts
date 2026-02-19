@@ -32,9 +32,14 @@ export const syncSlice = createSlice({
     removePendingAtIndex: (state, action: { payload: number }) => {
       state.pendingScores.splice(action.payload, 1);
     },
+    /** Replace pending queue (e.g. retain only failed items after a flush). */
+    setPendingScores: (state, action: { payload: PendingScore[] }) => {
+      state.pendingScores = action.payload;
+      if (action.payload.length === 0) state.lastSyncAt = new Date().toISOString();
+    },
     rehydrateSync: (_, action: { payload: SyncState }) => action.payload,
   },
 });
 
-export const { enqueueScore, clearPendingScores, removePendingAtIndex, rehydrateSync } =
+export const { enqueueScore, clearPendingScores, removePendingAtIndex, setPendingScores, rehydrateSync } =
   syncSlice.actions;
