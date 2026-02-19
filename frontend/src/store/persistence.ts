@@ -7,7 +7,7 @@ const DB_NAME = "logic-looper-db";
 const STORE_NAME = "persisted-state";
 const KEY = "root";
 
-/** Shape of user profile we persist (matches API response). */
+/** Shape of user profile we persist  */
 export interface PersistedUserProfile {
   id: string;
   email: string | null;
@@ -26,6 +26,10 @@ export interface PersistedState {
   };
   sync: { pendingScores: unknown[]; lastSyncAt: string | null };
   userProfile: { user: PersistedUserProfile | null; lastFetchedAt: string | null };
+  leaderboard?: {
+    data: unknown | null;
+    lastFetchedAt: string | null;
+  };
 }
 
 /** Turn an IndexedDB request into a Promise (IDB API is event-based). */
@@ -85,6 +89,7 @@ export type GetState = () => {
   progress: PersistedState["progress"];
   sync: PersistedState["sync"];
   userProfile: PersistedState["userProfile"];
+  leaderboard: { data: unknown | null; lastFetchedAt: string | null };
 };
 
 /**
@@ -111,6 +116,10 @@ export async function initPersistence(store: {
         progress: state.progress,
         sync: state.sync,
         userProfile: { user: state.userProfile.user, lastFetchedAt: state.userProfile.lastFetchedAt },
+        leaderboard: {
+          data: state.leaderboard.data,
+          lastFetchedAt: state.leaderboard.lastFetchedAt,
+        },
       }).catch((err) => console.warn("[persistence] save failed", err));
     }, SAVE_DELAY_MS);
   });

@@ -1,4 +1,4 @@
-import { Response } from 'express';
+import { Request, Response } from 'express';
 import { prisma } from '../db.js';
 import type { AuthenticatedRequest } from '../middleware/auth.js';
 import { isValidIsoDateString, isDateNotInFuture } from '../utils/dateUtils.js';
@@ -133,19 +133,83 @@ export async function getScore(req: Request, res: Response): Promise<void> {
 
 export async function getLeaderboard(req: Request, res: Response): Promise<void> {
   try {
-    const date = req.query.date as string | undefined;
-    const limit = Math.min(Number(req.query.limit) || 50, 100);
-    if (!date) {
-      res.status(400).json({ error: 'Query param required: date' });
+    const sortByRaw = req.query.sortBy as string | undefined;
+    const sortBy = sortByRaw ?? 'totalScore';
+    const limitRaw = Number(req.query.limit);
+    const limit = Number.isFinite(limitRaw) && limitRaw > 0 ? Math.min(limitRaw, 100) : 5;
+    const currentUserId = (req.query.userId as string | undefined)?.trim() || null;
+
+    if (sortBy !== 'totalScore') {
+      res.status(400).json({ error: 'Unsupported sortBy; currently only totalScore is supported' });
       return;
     }
-    const scores = await prisma.dailyScore.findMany({
-      where: { date },
-      orderBy: { score: 'desc' },
+
+    const users = await prisma.user.findMany({
+      orderBy: { totalPoints: 'desc' },
       take: limit,
-      include: { user: { select: { id: true, email: true } } },
+      select: {
+        id: true,
+        email: true,
+        totalPoints: true,
+        streakCount: true,
+        stats: {
+          select: {
+            avgSolveTimeMs: true,
+          },
+        },
+      },
     });
-    res.json({ date, scores });
+
+    let currentUser: {
+      id: string;
+      email: string | null;
+      totalPoints: number;
+      streakCount: number;
+      rank: number;
+    } | null = null;
+
+    if (currentUserId) {
+      const user = await prisma.user.findUnique({
+        where: { id: currentUserId },
+        select: {
+          id: true,
+          email: true,
+          totalPoints: true,
+          streakCount: true,
+        },
+      });
+
+      if (user) {
+        const betterCount = await prisma.user.count({
+          where: {
+            totalPoints: {
+              gt: user.totalPoints,
+            },
+          },
+        });
+
+        currentUser = {
+          id: user.id,
+          email: user.email,
+          totalPoints: user.totalPoints,
+          streakCount: user.streakCount,
+          rank: betterCount + 1,
+        };
+      }
+    }
+
+    res.json({
+      sortBy,
+      top: users.map((u, index) => ({
+        id: u.id,
+        email: u.email,
+        totalPoints: u.totalPoints,
+        streakCount: u.streakCount,
+        avgSolveTimeMs: u.stats?.avgSolveTimeMs ?? null,
+        rank: index + 1,
+      })),
+      currentUser,
+    });
   } catch (e) {
     console.error('[scoresController.getLeaderboard]', e);
     res.status(500).json({ error: 'Failed to fetch leaderboard' });

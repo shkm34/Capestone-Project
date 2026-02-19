@@ -5,6 +5,7 @@ import { getPuzzleTypeForDate } from '../utils/puzzleCycle';
 import { getPuzzleModule, type DailyPuzzle } from '../game/puzzleRegistry';
 import { markDaySolved, markHintUsed } from '../store/slices/progressSlice';
 import { submitOrEnqueueScore } from '../store/thunks/syncThunks';
+import { addToast } from '../store/slices/toastSlice';
 import type { AppDispatch, RootState } from '../store';
 
 export const useDailyGame = () => {
@@ -60,6 +61,15 @@ export const useDailyGame = () => {
     setScore(finalScore);
 
     if (correct) {
+      dispatch(
+        addToast({
+          message:
+            finalScore === baseScore
+              ? 'Correct! +10 points.'
+              : 'Correct (with hint)! +6 points.',
+          kind: 'success',
+        }),
+      );
       dispatch(markDaySolved({ date: todayIso, usedHint: hasUsedHintToday }));
       dispatch(
         submitOrEnqueueScore({
@@ -69,6 +79,13 @@ export const useDailyGame = () => {
           timeTakenMs,
         }),
       );
+    } else {
+      dispatch(
+        addToast({
+          message: 'Not quite, try again!',
+          kind: 'info',
+        }),
+      );
     }
   };
 
@@ -76,6 +93,12 @@ export const useDailyGame = () => {
     if (hasUsedHintToday || !puzzle) return;
     setHintText(module.getHint(puzzle));
     dispatch(markHintUsed({ date: todayIso }));
+    dispatch(
+      addToast({
+        message: 'Hint used – fewer points available today.',
+        kind: 'info',
+      }),
+    );
   };
 
   const isLoading = !puzzle;

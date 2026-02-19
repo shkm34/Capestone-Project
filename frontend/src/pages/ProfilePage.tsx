@@ -1,10 +1,14 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useCallback } from 'react';
 import { Link } from 'react-router-dom';
+import { useDispatch } from 'react-redux';
 import { YearHeatmap, type HeatmapActivity } from '../components/YearHeatmap';
 import { useProfileData } from '../hooks/useProfileData';
+import type { AppDispatch } from '../store';
+import { addToast } from '../store/slices/toastSlice';
 import { buildHeatmapActivity } from '../utils/heatmapActivity';
 
 export const ProfilePage: React.FC = () => {
+  const dispatch = useDispatch<AppDispatch>();
   const {
     userId,
     user,
@@ -22,6 +26,39 @@ export const ProfilePage: React.FC = () => {
     [completedByDate, user, pendingScores],
   );
 
+  const handleShare = useCallback(async () => {
+    if (!user) return;
+    const shareUrl = window.location.href;
+    const text = `My Logic Looper profile: ${user.totalPoints} points, ${streak} day streak.`;
+
+    try {
+      if (navigator.share) {
+        await navigator.share({
+          title: 'My Logic Looper stats',
+          text,
+          url: shareUrl,
+        });
+      } else if (navigator.clipboard) {
+        await navigator.clipboard.writeText(shareUrl);
+        dispatch(
+          addToast({
+            message: 'Profile link copied to clipboard.',
+            kind: 'success',
+          }),
+        );
+      } else {
+        dispatch(
+          addToast({
+            message: 'Sharing not supported in this browser.',
+            kind: 'warning',
+          }),
+        );
+      }
+    } catch {
+      // User cancelled share; no toast needed
+    }
+  }, [dispatch, user, streak]);
+
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex justify-center px-4 py-6">
       <div className="w-full max-w-3xl space-y-5">
@@ -30,12 +67,23 @@ export const ProfilePage: React.FC = () => {
           <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-white">
             Your Profile
           </h1>
-          <Link
-            to="/"
-            className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-slate-700 bg-slate-900/60 px-4 py-2 text-xs sm:text-sm font-medium text-slate-200 hover:bg-slate-800 hover:text-white transition-colors"
-          >
-            <span>←</span> Play
-          </Link>
+          <div className="flex items-center gap-2">
+            {user && (
+              <button
+                type="button"
+                onClick={handleShare}
+                className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-slate-700 bg-slate-900/60 px-3 py-2 text-xs sm:text-sm font-medium text-slate-200 hover:bg-slate-800 hover:text-white transition-colors"
+              >
+                <span>Share</span>
+              </button>
+            )}
+            <Link
+              to="/"
+              className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-slate-700 bg-slate-900/60 px-4 py-2 text-xs sm:text-sm font-medium text-slate-200 hover:bg-slate-800 hover:text-white transition-colors"
+            >
+              <span>←</span> Play
+            </Link>
+          </div>
         </div>
 
         {/* Not signed in */}

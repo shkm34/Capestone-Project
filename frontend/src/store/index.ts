@@ -3,6 +3,8 @@ import { authSlice } from './slices/authSlice';
 import { progressSlice } from './slices/progressSlice';
 import { syncSlice } from './slices/syncSlice';
 import { userProfileSlice } from './slices/userProfileSlice';
+import { leaderboardSlice } from './slices/leaderboardSlice';
+import { toastSlice } from './slices/toastSlice';
 import { initPersistence } from './persistence';
 
 export const store = configureStore({
@@ -11,6 +13,8 @@ export const store = configureStore({
     progress: progressSlice.reducer,
     sync: syncSlice.reducer,
     userProfile: userProfileSlice.reducer,
+    leaderboard: leaderboardSlice.reducer,
+    toast: toastSlice.reducer,
   },
 });
 
@@ -22,4 +26,4 @@ export function initStorePersistence(): Promise<Awaited<ReturnType<typeof initPe
 export type RootState = ReturnType<typeof store.getState>;
 export type AppDispatch = typeof store.dispatch;
 
-export { authSlice, progressSlice, syncSlice, userProfileSlice };
+export { authSlice, progressSlice, syncSlice, userProfileSlice, leaderboardSlice, toastSlice };

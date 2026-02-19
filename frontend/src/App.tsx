@@ -4,11 +4,13 @@ import { useDispatch, useSelector } from 'react-redux';
 import type { AppDispatch, RootState } from './store';
 import { PlayPage } from './pages/PlayPage';
 import { ProfilePage } from './pages/ProfilePage';
+import { LeaderboardPage } from './pages/LeaderboardPage';
 import { SignInPage } from './pages/SignInPage';
 import { signOut as apiSignOut } from './services/api';
 import { signOut as signOutAction } from './store/slices/authSlice';
 import { useAppBootstrap } from './hooks/useAppBootstrap';
 import { MainHeader } from './components/MainHeader';
+import { ToastContainer } from './components/ToastContainer';
 
 function AppContent(): React.ReactElement {
   const dispatch = useDispatch<AppDispatch>();
@@ -46,6 +48,7 @@ function AppContent(): React.ReactElement {
           <Routes>
             <Route path="/" element={<PlayPage key={userId ?? undefined} />} />
             <Route path="/profile" element={<ProfilePage />} />
+            <Route path="/leaderboard" element={<LeaderboardPage />} />
           </Routes>
         </div>
       </main>
@@ -56,6 +59,7 @@ function AppContent(): React.ReactElement {
 const App: React.FC = () => (
   <BrowserRouter>
     <AppContent />
+    <ToastContainer />
   </BrowserRouter>
 );
 

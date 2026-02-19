@@ -1,4 +1,4 @@
-import { createGuest, submitScore as apiSubmitScore, fetchUser, isOnline } from '../../services/api';
+import { createGuest, submitScore as apiSubmitScore, fetchUser, isOnline, fetchLeaderboard } from '../../services/api';
 import type { AppDispatch, RootState } from '../index';
 import { setGuest } from '../slices/authSlice';
 import { setUserProfile, setProfileFetchError, rehydrateUserProfile } from '../slices/userProfileSlice';
@@ -6,6 +6,8 @@ import { enqueueScore, setPendingScores } from '../slices/syncSlice';
 import { loadFromIndexedDB } from '../persistence';
 import type { PendingScore } from '../slices/syncSlice';
 import { buildSyntheticGuestProfile } from './buildSyntheticGuestProfile';
+import { setLeaderboard, setLeaderboardLoading, setLeaderboardError } from '../slices/leaderboardSlice';
+import { addToast } from '../slices/toastSlice';
 
 type AppThunk = (dispatch: AppDispatch, getState: () => RootState) => Promise<void>;
 
@@ -44,6 +46,12 @@ export function submitOrEnqueueScore(payload: SubmitOrEnqueuePayload): AppThunk 
 
     if (!isOnline()) {
       dispatch(enqueueScore(body));
+      dispatch(
+        addToast({
+          message: 'Score saved offline – will sync when you are online.',
+          kind: 'info',
+        }),
+      );
       return;
     }
 
@@ -53,6 +61,12 @@ export function submitOrEnqueueScore(payload: SubmitOrEnqueuePayload): AppThunk 
       const uid = nextState.auth.userId;
       if (!uid) {
         dispatch(enqueueScore(body));
+        dispatch(
+          addToast({
+            message: 'Could not identify user – score queued for later.',
+            kind: 'warning',
+          }),
+        );
         return;
       }
       await apiSubmitScore({
@@ -62,9 +76,20 @@ export function submitOrEnqueueScore(payload: SubmitOrEnqueuePayload): AppThunk 
         timeTakenMs: payload.timeTakenMs,
         streak,
       });
+      dispatch(
+        addToast({
+          message: 'Score submitted to server.',
+          kind: 'success',
+        }),
+      );
     } catch (e) {
-      console.warn('[sync] submitScore failed, enqueueing', e);
       dispatch(enqueueScore(body));
+      dispatch(
+        addToast({
+          message: 'Server unreachable – score queued for later.',
+          kind: 'warning',
+        }),
+      );
     }
   };
 }
@@ -90,7 +115,7 @@ export function flushPendingScores(): AppThunk {
           state = getState();
           uid = state.auth.userId!;
         } catch (e) {
-          console.warn('[sync] createGuest for flush failed', e);
+          //console.warn('[sync] createGuest for flush failed', e);
           return;
         }
       }
@@ -112,6 +137,28 @@ export function flushPendingScores(): AppThunk {
         }
       }
       dispatch(setPendingScores(failed));
+      if (failed.length === 0) {
+        dispatch(
+          addToast({
+            message: 'All pending scores synced to server.',
+            kind: 'success',
+          }),
+        );
+      } else if (failed.length < pending.length) {
+        dispatch(
+          addToast({
+            message: 'Some scores synced; remaining will retry when online.',
+            kind: 'warning',
+          }),
+        );
+      } else {
+        dispatch(
+          addToast({
+            message: 'Still offline – scores will sync when possible.',
+            kind: 'info',
+          }),
+        );
+      }
     } catch (e) {
       console.warn('[sync] flushPendingScores failed', e);
     }
@@ -144,6 +191,33 @@ export function fetchUserProfile(): AppThunk {
       } else {
         dispatch(setProfileFetchError(msg));
       }
+    }
+  };
+}
+
+/** Load leaderboard with offline-first behaviour: use cached Redux/IndexedDB data, refresh from network when possible. */
+export function loadLeaderboard(): AppThunk {
+  return async (dispatch, getState) => {
+    const state = getState();
+    const cached = state.leaderboard.data;
+
+    // If we already have data, don't block UI with a spinner.
+    dispatch(setLeaderboardLoading(!cached));
+    dispatch(setLeaderboardError(null));
+
+    try {
+      const res = await fetchLeaderboard({
+        sortBy: 'totalScore',
+        limit: 5,
+        userId: state.auth.userId ?? null,
+      });
+      dispatch(setLeaderboard({ data: res, fetchedAt: new Date().toISOString() }));
+    } catch (e) {
+      if (!cached) {
+        dispatch(setLeaderboardError('Unable to load leaderboard right now.'));
+      }
+    } finally {
+      dispatch(setLeaderboardLoading(false));
     }
   };
 }

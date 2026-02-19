@@ -101,6 +101,98 @@ export function isOnline(): boolean {
   return typeof navigator !== 'undefined' && navigator.onLine;
 }
 
+export interface LeaderboardEntry {
+  id: string;
+  email: string | null;
+  totalPoints: number;
+  streakCount: number;
+  avgSolveTimeMs: number | null;
+  rank: number;
+}
+
+export interface LeaderboardResponse {
+  sortBy: string;
+  top: LeaderboardEntry[];
+  currentUser: LeaderboardEntry | null;
+}
+
+let lastLeaderboard: LeaderboardResponse | null = null;
+let lastLeaderboardFetchedAt = 0;
+const LEADERBOARD_TTL_MS = 2 * 60 * 1000;
+const LEADERBOARD_BACKOFF_MS = 60 * 1000;
+let leaderboardBackoffUntil = 0;
+
+export async function fetchLeaderboard(params: {
+  sortBy?: string;
+  limit?: number;
+  userId?: string | null;
+} = {}): Promise<LeaderboardResponse> {
+  const now = Date.now();
+
+  // If we've recently seen the backend as unreachable, avoid spamming network errors.
+  if (now < leaderboardBackoffUntil) {
+    if (lastLeaderboard) {
+      return lastLeaderboard;
+    }
+    // No cached data: fail fast without issuing a network request (no net::ERR_*).
+    throw new Error('Leaderboard temporarily unavailable');
+  }
+
+  // Minimal client-side cache so leaderboard keeps showing if server is temporarily down.
+  if (lastLeaderboard && now - lastLeaderboardFetchedAt < LEADERBOARD_TTL_MS) {
+    try {
+      const url = new URL(`${getBaseUrl()}/api/score/leaderboard`);
+      if (params.sortBy) url.searchParams.set('sortBy', params.sortBy);
+      if (params.limit) url.searchParams.set('limit', String(params.limit));
+      if (params.userId) url.searchParams.set('userId', params.userId);
+
+      const res = await fetch(url.toString(), {
+        headers: authHeaders(),
+        credentials: 'include',
+      });
+
+      if (res.ok) {
+        const fresh = (await res.json()) as LeaderboardResponse;
+        lastLeaderboard = fresh;
+        lastLeaderboardFetchedAt = now;
+        leaderboardBackoffUntil = 0;
+        return fresh;
+      }
+      // Non-OK response: start backoff window.
+      leaderboardBackoffUntil = now + LEADERBOARD_BACKOFF_MS;
+    } catch {
+      // Network error: start backoff window and fall through to cached value.
+      leaderboardBackoffUntil = now + LEADERBOARD_BACKOFF_MS;
+    }
+    return lastLeaderboard;
+  }
+
+  const url = new URL(`${getBaseUrl()}/api/score/leaderboard`);
+  if (params.sortBy) url.searchParams.set('sortBy', params.sortBy);
+  if (params.limit) url.searchParams.set('limit', String(params.limit));
+  if (params.userId) url.searchParams.set('userId', params.userId);
+
+  try {
+    const res = await fetch(url.toString(), {
+      headers: authHeaders(),
+      credentials: 'include',
+    });
+    if (!res.ok) throw new Error(`fetchLeaderboard failed: ${res.status}`);
+    const data = (await res.json()) as LeaderboardResponse;
+    lastLeaderboard = data;
+    lastLeaderboardFetchedAt = now;
+    leaderboardBackoffUntil = 0;
+    return data;
+  } catch (e) {
+    // Any failure here starts a backoff window to avoid repeated network errors.
+    leaderboardBackoffUntil = now + LEADERBOARD_BACKOFF_MS;
+    if (lastLeaderboard) {
+      return lastLeaderboard;
+    }
+    throw e;
+  }
+}
+
 /** User profile from GET /api/users/:id (with stats and recent daily scores). */
 export interface UserProfile {
   id: string;

@@ -7,6 +7,7 @@ import { setUser, signOut as signOutAction, rehydrateAuth } from '../store/slice
 import { rehydrateProgress } from '../store/slices/progressSlice';
 import { rehydrateSync, type PendingScore } from '../store/slices/syncSlice';
 import { rehydrateUserProfile } from '../store/slices/userProfileSlice';
+import { rehydrateLeaderboard } from '../store/slices/leaderboardSlice';
 import { fetchUserProfile, flushPendingScores } from '../store/thunks/syncThunks';
 import { getSession, setStoredToken } from '../services/api';
 import { computeStreak } from '../utils/streakUtils';
@@ -44,6 +45,18 @@ export function useAppBootstrap(): boolean {
     (async () => {
       const saved = await initStorePersistence();
       if (cancelled) return;
+
+      // Rehydrate leaderboard from persistence (for offline-first leaderboard view).
+      if (saved?.leaderboard) {
+        dispatch(
+          rehydrateLeaderboard({
+            data: (saved.leaderboard.data ?? null) as any,
+            lastFetchedAt: saved.leaderboard.lastFetchedAt ?? null,
+            loading: false,
+            error: null,
+          }),
+        );
+      }
 
       // Handle Google OAuth token in URL hash, if present.
       const hash = window.location.hash;

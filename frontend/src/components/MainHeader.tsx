@@ -21,10 +21,10 @@ export const MainHeader: React.FC<MainHeaderProps> = ({ onSignOut }) => {
         </Link>
         <div className="flex items-center gap-3 sm:gap-4 text-sm font-medium">
           <Link
-            to="/"
+            to="/leaderboard"
             className="text-[#D9E2FF] hover:text-[#FFFFFF] transition-colors"
           >
-            Play
+            Leaderboard
           </Link>
           <Link
             to="/profile"
