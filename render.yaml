@@ -1,0 +1,28 @@
+# Render Blueprint: Logic Looper API (backend)
+# Deploy from repo root. Set env vars in Render Dashboard (Environment).
+# Database: create a PostgreSQL instance (Render or external) and set DATABASE_URL.
+
+services:
+  - type: web
+    name: logic-looper-api
+    runtime: node
+    rootDir: backend
+
+    buildCommand: npm install && npx prisma generate && npm run build
+    startCommand: npm start
+
+    envVars:
+      - key: NODE_VERSION
+        value: "20"
+      - key: DATABASE_URL
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: FRONTEND_URL
+        sync: false
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: GOOGLE_REDIRECT_URI
+        sync: false
