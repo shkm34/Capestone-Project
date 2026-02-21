@@ -88,12 +88,11 @@ export interface SubmitScoreBody {
 
 /** Thrown on non-2xx so callers can distinguish 4xx (client error) from 5xx/network. */
 export class ApiError extends Error {
-  constructor(
-    public readonly status: number,
-    message: string,
-  ) {
+  readonly status: number;
+  constructor(status: number, message: string) {
     super(message);
     this.name = 'ApiError';
+    this.status = status;
   }
 }
 
